@@ -1,0 +1,8 @@
+# Files Git should never upload (OWNER: Person 4)
+__pycache__/
+*.pyc
+.venv/
+venv/
+.DS_Store
+.vscode/
+.idea/

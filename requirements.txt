@@ -1,0 +1,5 @@
+# Libraries the game needs. Install with:  pip install -r requirements.txt
+# OWNER: Person 4
+# pygame-ce is the community edition of Pygame: same "import pygame",
+# but it supports new Python versions (3.13 / 3.14) that classic pygame may not.
+pygame-ce
