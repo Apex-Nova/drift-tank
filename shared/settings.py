@@ -5,8 +5,11 @@
 # =====================================================================
 #
 # WHAT THIS FILE IS
-#   Constants that EVERY part imports, e.g.
-#       from shared.settings import SCREEN_WIDTH, TANK_SPEED
+#   Constants that EVERY part imports, grouped in one class, e.g.
+#       from shared.settings import Settings
+#       Settings.SCREEN_WIDTH, Settings.TANK_SPEED
+#   (Starter version written by Person 1 so the skeleton runs —
+#    Person 4: it's yours now, keep the names stable or tell the team.)
 #   Keeping them in one file means no one has "magic numbers" scattered
 #   around, and changing the game's balance happens in one place.
 #
@@ -36,6 +39,27 @@
 #       (careful: some keyboards can't register many keys pressed at once)
 #
 # DON'T
-#   - No functions or classes here, only values.
+#   - Only values in here (inside the Settings class) — no functions/logic.
 #   - Don't import other project files here (everyone imports THIS one).
 # =====================================================================
+class Settings:
+    SCREEN_WIDTH = 800
+    SCREEN_HEIGHT = 600
+    FPS = 60
+    TILE_SIZE = 40
+    BACKGROUND_COLOR = (50, 50, 50)
+    WALL_COLOR = (100, 100, 100)
+    DESTRUCTIBLE_WALL_COLOR = (150, 75, 0)
+    PLAYER_COLORS = [(255, 0, 0), (0, 0, 255), (0, 255, 0), (255, 255, 0)]
+    TANK_SPEED = 3
+    TANK_SIZE = (40, 40)
+    TANK_MAX_HEALTH = 100
+    TANK_SHOOT_COOLDOWN = 500
+    BULLET_SPEED = 10
+    BULLET_SIZE = (10, 10)
+    BULLET_DAMAGE = 25
+    DESTRUCTIBLE_WALL_HEALTH = 50
+    POWERUP_SPAWN_INTERVAL = 10000
+    POWERUP_DURATION = 5000
+    MAX_POWERUPS_ON_MAP = 3
+    MATCH_TIME_LIMIT = 300

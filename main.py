@@ -27,3 +27,12 @@
 #   (If you get "ModuleNotFoundError", you are probably running it from
 #    the wrong folder — study how Python decides where to look for imports.)
 # =====================================================================
+
+
+class Main:
+    def __init__(self):
+        from part1_engine.game import Game
+        game = Game()
+        game.run()
+
+Main()  # Start the game when this file is run directly

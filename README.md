@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # 🎮 Drift Tank
 
 A local-multiplayer tank game built with Python and Pygame. 2–4 players share one
@@ -78,7 +77,3 @@ git push origin part2/bullet-movement
 
 ## 📝 Commit prefixes
 `feat:` new feature · `fix:` bug fix · `docs:` documentation · `refactor:` cleanup · `assets:` art/sound
-=======
-# drift-tank
-multiplayer tank battleground game
->>>>>>> 16c161e87db010591f743a3a6f4329ddb5fa2136
