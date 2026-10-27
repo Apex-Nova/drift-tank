@@ -49,3 +49,45 @@
 #   "Move a square with the arrow keys" — 1 window, 1 rect, 1 loop.
 #   That small exercise is 80% of this file.
 # =====================================================================
+import pygame
+from pygame.math import Vector2
+from shared.settings import Settings
+
+class Tank:
+    def __init__(self,start_x, start_y, color, name, speed, score=0, controls=None):
+        self.speed = speed or Settings.TANK_SPEED
+        self.color = color
+        self.name = name
+        self.score = score
+        self.controls = controls or {
+            "up": pygame.K_UP,
+            "down": pygame.K_DOWN,
+            "left": pygame.K_LEFT,
+            "right": pygame.K_RIGHT
+        }
+
+        self.rect = pygame.Rect(start_x, start_y, 50, 50)
+        self.pos = Vector2(self.rect.center)
+
+    def move(self, keys):
+        arrow =  Vector2(0, 0)
+        if keys[self.controls["up"]] and not(self.rect.top <= 0):
+            arrow -= Vector2(0, 1)
+        if keys[self.controls["down"]] and not(self.rect.bottom >= Settings.SCREEN_HEIGHT):
+            arrow += Vector2(0, 1)
+        if keys[self.controls["left"]] and not(self.rect.left <= 0):
+            arrow -= Vector2(1, 0)
+        if keys[self.controls["right"]] and not(self.rect.right >= Settings.SCREEN_WIDTH):
+            arrow += Vector2(1, 0)
+        if arrow.length() > 0:
+            arrow = arrow.normalize()
+
+        self.pos += arrow * self.speed
+        self.rect.center = self.pos
+        screen_rect = pygame.Rect(0, 0, Settings.SCREEN_WIDTH, Settings.SCREEN_HEIGHT)
+        self.rect.clamp_ip(screen_rect)
+        self.pos = Vector2(self.rect.center)    
+
+
+    def draw(self, screen):
+        pygame.draw.rect(screen, self.color, self.rect)

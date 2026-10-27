@@ -12,9 +12,12 @@ in your PR. Never silently rename something on this list.
 ---
 
 ## shared/settings.py — Person 4
-Plain constants: `SCREEN_WIDTH`, `SCREEN_HEIGHT`, `FPS`, `TILE_SIZE`, colors,
-`TANK_SPEED`, `TANK_MAX_HEALTH`, `SHOOT_COOLDOWN_MS`, `BULLET_SPEED`, `BULLET_DAMAGE`,
-`WALL_HEALTH`, power-up timings, `MATCH_TIME`, and `PLAYER_CONTROLS` (keys for P1–P4).
+All constants live in one class: `from shared.settings import Settings`, then `Settings.NAME`.
+Current names: `SCREEN_WIDTH`, `SCREEN_HEIGHT`, `FPS`, `TILE_SIZE`, `BACKGROUND_COLOR`,
+`WALL_COLOR`, `DESTRUCTIBLE_WALL_COLOR`, `PLAYER_COLORS`, `TANK_SPEED`, `TANK_SIZE`,
+`TANK_MAX_HEALTH`, `TANK_SHOOT_COOLDOWN`, `BULLET_SPEED`, `BULLET_SIZE`, `BULLET_DAMAGE`,
+`DESTRUCTIBLE_WALL_HEALTH`, `POWERUP_SPAWN_INTERVAL`, `POWERUP_DURATION`,
+`MAX_POWERUPS_ON_MAP`, `MATCH_TIME_LIMIT`. Still to add: `PLAYER_CONTROLS` (keys for P1–P4).
 
 ## Tank — Person 1 (`part1_engine/tank.py`)
 | Name | What it is |
