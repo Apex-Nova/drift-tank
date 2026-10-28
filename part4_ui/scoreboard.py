@@ -30,3 +30,38 @@
 #   This file needs NO window at all. In practice/<your-name>/, make fake
 #   players, call register_kill a few times, and print the results.
 # =====================================================================
+
+
+
+
+import pygame
+from shared.settings import MATCH_TIME
+
+
+class Scoreboard:
+    def __init__(self):
+        self.kills = {1: 0, 2: 0, 3: 0, 4: 0}
+        self.start_time = pygame.time.get_ticks()
+
+    def register_kill(self, killer, victim):
+        player_id = killer.player_id
+        self.kills[player_id] += 1
+
+    def is_game_over(self, tanks):
+        alive_count = 0
+        for tank in tanks:
+            if tank.alive:
+                alive_count += 1
+        return alive_count <= 1 or self.time_left() == 0
+    def winner(self):
+        highest_kills = max(self.kills.values())
+        for player_id, kills in self.kills.items():
+            if kills == highest_kills:
+                return player_id
+    def time_left(self):
+        elapsed_ms = pygame.time.get_ticks() - self.start_time
+        elapsed_seconds = elapsed_ms // 1000
+        return max(0, MATCH_TIME - elapsed_seconds)
+    def reset(self):
+        self.kills = {1: 0, 2: 0, 3: 0, 4: 0}
+        self.start_time = pygame.time.get_ticks()

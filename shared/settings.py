@@ -39,3 +39,7 @@
 #   - No functions or classes here, only values.
 #   - Don't import other project files here (everyone imports THIS one).
 # =====================================================================
+
+
+MATCH_TIME = 120
+TANK_MAX_HEALTH = 100
