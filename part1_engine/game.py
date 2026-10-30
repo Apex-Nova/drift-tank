@@ -64,3 +64,42 @@
 #   - Don't write bullet/wall/menu logic here. If you need it, ask the owner.
 #   - Don't edit other people's files. Use a fake/placeholder until theirs lands.
 # =====================================================================
+import pygame
+pygame.init()
+
+from shared.settings import Settings
+from part1_engine.tank import Tank
+
+
+class Game:
+    def __init__(self):
+        self.running = True
+        self.screen_height = Settings.SCREEN_HEIGHT
+        self.screen_width = Settings.SCREEN_WIDTH
+        self.x = self.screen_width//2
+        self.y = self.screen_height//2
+
+        self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
+        pygame.display.set_caption("Drift Tank")
+
+        self.player1 = Tank(self.x, self.y, (255, 0, 0), "Player 1", controls={"up": pygame.K_w, "down": pygame.K_s, "left": pygame.K_a, "right": pygame.K_d}, speed = Settings.TANK_SPEED)
+        self.player2 = Tank(self.x + 100, self.y, (0, 0, 0), "Player 2", controls={"up": pygame.K_UP, "down": pygame.K_DOWN, "left": pygame.K_LEFT, "right": pygame.K_RIGHT}, speed = Settings.TANK_SPEED + 1)
+
+        self.clock = pygame.time.Clock()
+
+    def run(self):
+        while self.running:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    self.running = False
+            self.screen.fill((96,128,255))
+            keys = pygame.key.get_pressed()
+            if keys[pygame.K_ESCAPE]:
+                self.running = False
+            self.player1.move(keys)
+            self.player1.draw(self.screen)
+            self.player2.move(keys)
+            self.player2.draw(self.screen)
+            pygame.display.flip()
+            self.clock.tick(60)
+        pygame.quit()
