@@ -31,3 +31,35 @@
 #   In practice/<your-name>/: a window with a few walls. Press a key to
 #   call hit() on one and watch it break.
 # =====================================================================
+
+import pygame
+
+class Wall:
+    def __init__(self, rect, destructible):
+        """Create a wall at the given rect. If destructible, it has health."""
+        self.rect = rect
+        self.destructible = destructible
+        self.alive = True
+        if destructible:
+            self.health = 5 
+        else:
+            self.health = None  
+
+    def hit(self, damage):
+        """only destruction walls is lose its health
+        """
+        if self.destructible:
+            self.health -= damage
+            if self.health <= 0:
+                self.alive = False
+
+    def draw(self, screen):
+        if not self.alive:
+            return  
+        if self.destructible:
+            
+            pygame.draw.rect(screen, (25, 35, 40), self.rect)
+        else:
+            
+            pygame.draw.rect(screen, (100, 100, 100), self.rect)
+    
