@@ -37,3 +37,44 @@
 #   build_arena(map_name) → (list of walls, list of spawn points)
 #   Person 1 calls this once at the start of every match.
 # =====================================================================
+import pygame
+from part3_world.wall import Wall
+
+
+grid =[
+    "###",
+    ".1.",
+    "###",
+
+]
+tile_size = 40   
+walls = []
+spawn_points = []
+
+
+for row_index,row in enumerate(grid):
+    for col_index,cell in enumerate(row):
+        if cell == "#":
+         x = col_index * tile_size
+         y = row_index * tile_size
+         rect = pygame.Rect(x, y, tile_size, tile_size)
+         wall = Wall(rect, destructible=False)
+         walls.append(wall)
+        elif cell == "1":
+         x = col_index * tile_size
+         y = row_index * tile_size
+         spawn_points.append((x, y))
+print(spawn_points)
+print("Walls:", len(walls))
+print("Spawn points:", spawn_points)
+
+def show_count(count):
+   print("walls:", count)
+
+show_count(len(walls))
+
+def get_arena_data():
+    return walls, spawn_points
+
+arena_walls, arena_spawns = get_arena_data()
+print(len(arena_walls), arena_spawns)
