@@ -1,16 +1,5 @@
-"""Functions that check when bullets, tanks, and walls touch."""
-
-
-def rect_touches_wall(rect, walls):
-    """Kya rect kisi zinda wall ko touch karta hai? True ya False do."""
-    return any(
-        getattr(wall, "alive", True) and rect.colliderect(wall.rect)
-        for wall in walls
-    )
-
-
-def handle_bullet_wall_collisions(bullets, walls):
-    """Wall se takrane par bullet hatao; breakable wall ko damage do."""
+def bullets_vs_walls(bullets, walls):
+    """Destroy bullets that hit live walls and damage destructible walls."""
     for bullet in bullets:
         if not bullet.alive:
             continue
@@ -18,42 +7,45 @@ def handle_bullet_wall_collisions(bullets, walls):
         for wall in walls:
             if not getattr(wall, "alive", True):
                 continue
-            if not bullet.rect.colliderect(wall.rect):
-                continue
 
-            bullet.alive = False
-            if getattr(wall, "destructible", False):
-                wall.hit(bullet.damage)
-            break  # Ek bullet ek hi wall ko hit karegi.
+            if bullet.rect.colliderect(wall.rect):
+                if getattr(wall, "destructible", False):
+                    wall.hit(bullet.damage)
+
+                bullet.alive = False
+                break
 
 
-def handle_bullet_tank_collisions(bullets, tanks, scoreboard=None):
-    """Tank ko hit hone par damage do aur kill ko scoreboard par bhejo.
-
-    Shooter ko ignore karte hain. Pehli hit ke baad bullet khatam hoti hai.
-    """
+def bullets_vs_tanks(bullets, tanks, scoreboard=None):
+    """Damage tanks hit by bullets and optionally report kills."""
     for bullet in bullets:
         if not bullet.alive:
             continue
 
         for tank in tanks:
-            if not getattr(tank, "alive", True) or tank is bullet.owner:
+            if tank is bullet.owner:
                 continue
-            if not bullet.rect.colliderect(tank.rect):
+            if not getattr(tank, "alive", True):
                 continue
 
-            tank.take_damage(bullet.damage)
-            bullet.alive = False
+            if bullet.rect.colliderect(tank.rect):
+                was_alive = getattr(tank, "alive", True)
+                tank.take_damage(bullet.damage)
+                bullet.alive = False
 
-            if not tank.alive and scoreboard is not None:
-                scoreboard.register_kill(bullet.owner, tank)
-            break  # Ek bullet ek hi tank ko damage karegi.
+                if (
+                    was_alive
+                    and not getattr(tank, "alive", True)
+                    and scoreboard is not None
+                ):
+                    scoreboard.register_kill(bullet.owner, tank)
+
+                break
 
 
-def resolve_collisions(bullets, walls, tanks, scoreboard=None):
-    """Pehle wall, phir tank collision check karo.
-
-    Bullet move karne ke baad call karo. Wall peeche ke tank ko bachayegi.
-    """
-    handle_bullet_wall_collisions(bullets, walls)
-    handle_bullet_tank_collisions(bullets, tanks, scoreboard)
+def rect_touches_wall(rect, walls):
+    """Return True if rect overlaps any live wall."""
+    return any(
+        getattr(wall, "alive", True) and rect.colliderect(wall.rect)
+        for wall in walls
+    )

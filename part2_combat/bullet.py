@@ -1,35 +1,53 @@
 import pygame
+from pygame.math import Vector2
 
-from shared import settings
+from shared.settings import Settings
 
 
 class Bullet:
-    def __init__(self, x, y, direction, owner, damage=None, speed=None, size=None):
-        # Use shared defaults, but allow a tank to customize its own bullet.
-        bullet_size = size if size is not None else getattr(settings, "BULLET_SIZE", 10)
-        self.rect = pygame.Rect(x, y, bullet_size, bullet_size)
+    """A projectile fired by a tank."""
 
-        self.direction = direction
+    def __init__(self, owner, direction):
         self.owner = owner
-        self.speed = speed if speed is not None else getattr(settings, "BULLET_SPEED", 7)
-        self.damage = damage if damage is not None else getattr(settings, "BULLET_DAMAGE", 1)
+        self.direction = Vector2(direction)
+
+        if self.direction.length_squared() == 0:
+            self.direction = Vector2(0, -1)
+        else:
+            self.direction = self.direction.normalize()
+
+        self.speed = Settings.BULLET_SPEED
+        self.damage = Settings.BULLET_DAMAGE
         self.alive = True
 
+        width, height = Settings.BULLET_SIZE
+        self.rect = pygame.Rect(0, 0, width, height)
+
+        # Place the bullet just outside the front of its tank.
+        offset = max(owner.rect.width, owner.rect.height) / 2
+        offset += max(width, height) / 2
+        self.position = Vector2(owner.rect.center) + self.direction * offset
+        self.rect.center = (round(self.position.x), round(self.position.y))
+
     def update(self):
-        # Move the bullet in the direction it was fired.
-        dx, dy = self.direction
-        self.rect.x += dx * self.speed
-        self.rect.y += dy * self.speed
+        """Move the bullet and mark it dead after it leaves the screen."""
+        if not self.alive:
+            return
 
-        # Remove it after it leaves the screen.
-        width = getattr(settings, "SCREEN_WIDTH", 800)
-        height = getattr(settings, "SCREEN_HEIGHT", 600)
+        self.position += self.direction * self.speed
+        self.rect.center = (round(self.position.x), round(self.position.y))
 
-        if not pygame.Rect(0, 0, width, height).colliderect(self.rect):
+        screen_rect = pygame.Rect(
+            0,
+            0,
+            Settings.SCREEN_WIDTH,
+            Settings.SCREEN_HEIGHT,
+        )
+        if not screen_rect.contains(self.rect):
             self.alive = False
 
     def draw(self, screen):
-        # Draw live bullets in the shooter's color.
+        """Draw the bullet using its owner's color."""
         if self.alive:
-            color = getattr(self.owner, "color", (255, 230, 80))
+            color = getattr(self.owner, "color", (255, 255, 255))
             pygame.draw.rect(screen, color, self.rect)
