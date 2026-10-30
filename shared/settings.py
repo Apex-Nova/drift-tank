@@ -42,6 +42,10 @@
 #   - Only values in here (inside the Settings class) — no functions/logic.
 #   - Don't import other project files here (everyone imports THIS one).
 # =====================================================================
+
+
+MATCH_TIME = 120
+TANK_MAX_HEALTH = 100
 class Settings:
     SCREEN_WIDTH = 800
     SCREEN_HEIGHT = 600
