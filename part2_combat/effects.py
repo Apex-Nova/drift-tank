@@ -1,30 +1,62 @@
-# =====================================================================
-#  part2_combat/effects.py  —  EXPLOSIONS, HIT FLASHES, SCREEN SHAKE
-#  OWNER: Person 2 (Combat)          WHEN: Phase 4 (polish — optional)
-# =====================================================================
-#
-# WHAT THIS FILE IS
-#   Short-lived visual effects that make hits feel good. An effect is an
-#   object that lives for a fixed time (e.g. 300 ms), draws itself, then
-#   disappears. Only start this after bullets + collisions work.
-#
-# TOPICS TO STUDY
-#   1. Objects with a "lifetime": store the spawn time, compare with
-#      pygame.time.get_ticks() each frame
-#   2. Simple particles: many tiny dots with random directions
-#      (the random module: random.uniform, random.randint)
-#   3. Transparency: a Surface made with pygame.SRCALPHA, and fading by
-#      lowering alpha over time
-#   4. Screen shake: drawing everything with a small random offset for a
-#      few frames (needs a tiny agreement with Person 1)
-#
-# WHAT TO BUILD
-#   [ ] Explosion effect when a tank dies (growing circle or particles)
-#   [ ] Small spark when a bullet hits a wall
-#   [ ] A list of active effects that updates/draws/removes itself
-#   [ ] (Optional) screen shake on big explosions
-#
-# CONTRACT
-#   Something like spawn_explosion(x, y), update_effects(), draw_effects(screen)
-#   — add the exact names to docs/CLASS_CONTRACTS.md before Person 1 calls them.
-# =====================================================================
+import pygame
+
+
+class Explosion:
+    """An expanding ring that fades out after a short time."""
+
+    def __init__(self, x, y, color=(255, 150, 30), duration_ms=350):
+        self.x = int(x)
+        self.y = int(y)
+        self.color = color
+        self.duration_ms = duration_ms
+        self.started_at = pygame.time.get_ticks()
+
+    @property
+    def alive(self):
+        elapsed = pygame.time.get_ticks() - self.started_at
+        return elapsed < self.duration_ms
+
+    def draw(self, screen):
+        elapsed = pygame.time.get_ticks() - self.started_at
+        if elapsed >= self.duration_ms:
+            return
+
+        progress = elapsed / self.duration_ms
+        radius = max(2, int(5 + progress * 22))
+        alpha = max(0, int(255 * (1 - progress)))
+
+        size = radius * 2 + 4
+        surface = pygame.Surface((size, size), pygame.SRCALPHA)
+
+        pygame.draw.circle(
+            surface,
+            (*self.color, alpha),
+            (size // 2, size // 2),
+            radius,
+            width=3,
+        )
+
+        screen.blit(
+            surface,
+            (self.x - size // 2, self.y - size // 2),
+        )
+
+
+class EffectManager:
+    """Stores and draws temporary visual effects."""
+
+    def __init__(self):
+        self.effects = []
+
+    def spawn_explosion(self, x, y, color=(255, 150, 30)):
+        self.effects.append(Explosion(x, y, color))
+
+    def update(self):
+        self.effects = [
+            effect for effect in self.effects
+            if effect.alive
+        ]
+
+    def draw(self, screen):
+        for effect in self.effects:
+            effect.draw(screen)
