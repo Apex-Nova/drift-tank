@@ -1,41 +1,35 @@
-# =====================================================================
-#  part2_combat/bullet.py  —  THE BULLET CLASS
-#  OWNER: Person 2 (Combat)          WHEN: Phase 2
-# =====================================================================
-#
-# WHAT THIS FILE IS
-#   One class, Bullet. A tank creates a Bullet when it shoots. The bullet
-#   flies in a straight line every frame until it hits something or
-#   leaves the screen. There will be MANY bullets at once.
-#
-# TOPICS TO STUDY (in this order)
-#   1. Python classes (__init__, self, methods)
-#   2. pygame.Rect — position + size, and moving it
-#   3. Direction vectors: a direction (dx, dy) times a speed = how far to
-#      move this frame. Why (1, 0) * 7 moves right by 7 pixels.
-#      Also look at pygame.math.Vector2 as an alternative to plain tuples.
-#   4. Rect positions are WHOLE numbers — what happens to slow/diagonal
-#      movement, and why some games store a float position separately
-#   5. Off-screen check: compare the bullet's rect with the screen's rect
-#   6. Managing a list of many objects: why you must NOT remove items from a
-#      list while looping over that same list, and 2 safe ways to do it
-#   7. pygame.draw.circle / pygame.draw.rect for drawing small things
-#
-# WHAT TO BUILD — step by step
-#   [ ] Bullet stores: rect, owner (the tank that fired it), direction,
-#       speed, damage, alive
-#   [ ] update(): moves one step in its direction
-#   [ ] When it leaves the screen it marks itself not alive
-#   [ ] draw(screen): a small circle or rectangle (owner's color is a nice touch)
-#   [ ] Agree with Person 1: tank.shoot() creates Bullet(...) — decide
-#       together exactly which arguments the constructor takes, and write it
-#       into docs/CLASS_CONTRACTS.md
-#   [ ] (Stretch) bullets that bounce off walls once
-#
-# CONTRACT (others rely on these — see docs/CLASS_CONTRACTS.md)
-#   rect, owner, direction, damage, alive, update(), draw()
-#
-# HOW TO TEST ALONE (without waiting for Person 1)
-#   In practice/<your-name>/, make a FAKE tank: any tiny class with a .rect
-#   and a .direction. Press space → create a bullet from it → watch it fly.
-# =====================================================================
+import pygame
+
+from shared import settings
+
+
+class Bullet:
+    def __init__(self, x, y, direction, owner, damage=None, speed=None, size=None):
+        # Use shared defaults, but allow a tank to customize its own bullet.
+        bullet_size = size if size is not None else getattr(settings, "BULLET_SIZE", 10)
+        self.rect = pygame.Rect(x, y, bullet_size, bullet_size)
+
+        self.direction = direction
+        self.owner = owner
+        self.speed = speed if speed is not None else getattr(settings, "BULLET_SPEED", 7)
+        self.damage = damage if damage is not None else getattr(settings, "BULLET_DAMAGE", 1)
+        self.alive = True
+
+    def update(self):
+        # Move the bullet in the direction it was fired.
+        dx, dy = self.direction
+        self.rect.x += dx * self.speed
+        self.rect.y += dy * self.speed
+
+        # Remove it after it leaves the screen.
+        width = getattr(settings, "SCREEN_WIDTH", 800)
+        height = getattr(settings, "SCREEN_HEIGHT", 600)
+
+        if not pygame.Rect(0, 0, width, height).colliderect(self.rect):
+            self.alive = False
+
+    def draw(self, screen):
+        # Draw live bullets in the shooter's color.
+        if self.alive:
+            color = getattr(self.owner, "color", (255, 230, 80))
+            pygame.draw.rect(screen, color, self.rect)
