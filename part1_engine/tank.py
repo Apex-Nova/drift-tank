@@ -52,12 +52,23 @@
 import pygame
 from pygame.math import Vector2
 from shared.settings import Settings
+from part2_combat.collisions import rect_touches_wall
+
+from part2_combat.bullet import Bullet
 
 class Tank:
-    def __init__(self,start_x, start_y, color, name, speed, score=0, controls=None):
+    def __init__(self,start_x, start_y, color, name, speed,player_id, score=0, controls=None):
+
+        self.hull_image = pygame.image.load("part1_engine/assets/tank_hull.png").convert_alpha()
+        self.gun_image = pygame.image.load("part1_engine/assets/tank_gun.png").convert_alpha()
+
+
         self.speed = speed or Settings.TANK_SPEED
         self.color = color
+        tint = (self.color[0] // 3, self.color[1] // 3, self.color[2] // 3)
+        self.hull_image.fill(tint, special_flags=pygame.BLEND_RGB_ADD)
         self.name = name
+        self.player_id = player_id
         self.score = score
         self.controls = controls or {
             "up": pygame.K_UP,
@@ -65,11 +76,34 @@ class Tank:
             "left": pygame.K_LEFT,
             "right": pygame.K_RIGHT
         }
+        self.health = Settings.TANK_MAX_HEALTH
+        self.alive = True
 
         self.rect = pygame.Rect(start_x, start_y, 50, 50)
         self.pos = Vector2(self.rect.center)
 
-    def move(self, keys):
+        self.barrel_angle = 0           # barrel angles
+        self.barrel_speed = 3           # barrel angles
+        self.aim = Vector2(1, 0)        # barrel angles
+
+        self.hull_angle = 0
+        self.target_angle = 0
+        self.hull_turn_speed = 4
+
+        self.last_shot_time = 0
+    def shoot(self):    
+        current_time = pygame.time.get_ticks()
+        if current_time - self.last_shot_time >= Settings.TANK_SHOOT_COOLDOWN:
+            self.last_shot_time = current_time
+            return Bullet(self, self.aim)
+        return None
+
+    def take_damage(self, amount):
+        self.health -= amount
+        if self.health <= 0:
+            self.alive = False
+
+    def move(self, keys, walls):
         arrow =  Vector2(0, 0)
         if keys[self.controls["up"]] and not(self.rect.top <= 0):
             arrow -= Vector2(0, 1)
@@ -82,12 +116,55 @@ class Tank:
         if arrow.length() > 0:
             arrow = arrow.normalize()
 
-        self.pos += arrow * self.speed
+
+        if keys[self.controls["barrel_left"]]:
+            self.barrel_angle -= self.barrel_speed
+        if keys[self.controls["barrel_right"]]:
+            self.barrel_angle += self.barrel_speed
+        self.barrel_angle %= 360
+        self.aim = Vector2(1, 0).rotate(self.barrel_angle)
+
+        if arrow.length() > 0:
+            arrow = arrow.normalize()
+            self.target_angle = Vector2(1, 0).angle_to(arrow)
+
+
+
+
+        difference = (self.target_angle - self.hull_angle + 180) % 360 - 180
+        if abs(difference) <= self.hull_turn_speed:
+            self.hull_angle = self.target_angle
+        elif difference > 0:
+            self.hull_angle += self.hull_turn_speed
+        else:
+            self.hull_angle -= self.hull_turn_speed
+        drive = Vector2(0, 0)
+        if arrow.length() > 0:
+            drive = Vector2(1, 0).rotate(self.hull_angle)
+
+        self.pos.x += drive.x * self.speed
         self.rect.center = self.pos
+        if rect_touches_wall(self.rect, walls):
+            self.pos.x -= drive.x * self.speed
+            self.rect.center = self.pos
+
+        self.pos.y += drive.y * self.speed
+        self.rect.center = self.pos
+        if rect_touches_wall(self.rect, walls):
+            self.pos.y -= drive.y * self.speed
+            self.rect.center = self.pos 
+
         screen_rect = pygame.Rect(0, 0, Settings.SCREEN_WIDTH, Settings.SCREEN_HEIGHT)
-        self.rect.clamp_ip(screen_rect)
-        self.pos = Vector2(self.rect.center)    
+        clamped = self.rect.clamp(screen_rect)
+        if clamped != self.rect:
+            self.rect = clamped
+            self.pos = Vector2(self.rect.center)    
+
+        
 
 
     def draw(self, screen):
-        pygame.draw.rect(screen, self.color, self.rect)
+        hull = pygame.transform.rotate(self.hull_image, -self.hull_angle)
+        screen.blit(hull, hull.get_rect(center=self.rect.center))
+        gun = pygame.transform.rotate(self.gun_image, -self.barrel_angle)
+        screen.blit(gun, gun.get_rect(center=self.rect.center))

@@ -65,6 +65,11 @@
 #   - Don't edit other people's files. Use a fake/placeholder until theirs lands.
 # =====================================================================
 import pygame
+from part1_engine import tank
+from part3_world.wall import Wall
+from part2_combat.collisions import bullets_vs_walls, bullets_vs_tanks
+from part4_ui.scoreboard import Scoreboard
+from part4_ui.hud import draw_hud
 pygame.init()
 
 from shared.settings import Settings
@@ -82,9 +87,18 @@ class Game:
         self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
         pygame.display.set_caption("Drift Tank")
 
-        self.player1 = Tank(self.x, self.y, (255, 0, 0), "Player 1", controls={"up": pygame.K_w, "down": pygame.K_s, "left": pygame.K_a, "right": pygame.K_d}, speed = Settings.TANK_SPEED)
-        self.player2 = Tank(self.x + 100, self.y, (0, 0, 0), "Player 2", controls={"up": pygame.K_UP, "down": pygame.K_DOWN, "left": pygame.K_LEFT, "right": pygame.K_RIGHT}, speed = Settings.TANK_SPEED + 1)
-
+        self.player1 = Tank(self.x, self.y, (255, 0, 0), "Player 1", controls={"up": pygame.K_w, "down": pygame.K_s, "left": pygame.K_a, "right": pygame.K_d, "barrel_left": pygame.K_q, "barrel_right": pygame.K_e, "shoot": pygame.K_SPACE}, speed = Settings.TANK_SPEED, player_id=1)
+        self.player2 = Tank(self.x + 100, self.y, (255, 255, 0), "Player 2", controls={"up": pygame.K_UP, "down": pygame.K_DOWN, "left": pygame.K_LEFT, "right": pygame.K_RIGHT, "barrel_left": pygame.K_HASH, "barrel_right": pygame.K_BACKSLASH, "shoot": pygame.K_RETURN}, speed = Settings.TANK_SPEED + 1, player_id=2)
+        self.tanks = [
+                    self.player1,
+                    self.player2,
+                ]
+        self.walls = [
+                    Wall(pygame.Rect(200, 200, 40, 40), destructible=False),
+                    Wall(pygame.Rect(600, 400, 40, 40), destructible=False),
+                ]
+        self.bullets = []
+        self.scoreboard = Scoreboard()
         self.clock = pygame.time.Clock()
 
     def run(self):
@@ -96,10 +110,25 @@ class Game:
             keys = pygame.key.get_pressed()
             if keys[pygame.K_ESCAPE]:
                 self.running = False
-            self.player1.move(keys)
-            self.player1.draw(self.screen)
-            self.player2.move(keys)
-            self.player2.draw(self.screen)
+            for wall in self.walls:
+                wall.draw(self.screen)
+            for tank in self.tanks:
+                if not tank.alive:
+                    continue
+                tank.move(keys, self.walls)
+                if keys[tank.controls["shoot"]]:
+                    bullet = tank.shoot()
+                    if bullet is not None:
+                        self.bullets.append(bullet)
+                tank.draw(self.screen)
+            for bullet in self.bullets:
+                bullet.update()
+            bullets_vs_walls(self.bullets, self.walls)
+            bullets_vs_tanks(self.bullets, self.tanks, self.scoreboard)
+            self.bullets = [bullet for bullet in self.bullets if bullet.alive]
+            for bullet in self.bullets:
+                bullet.draw(self.screen)
+            draw_hud(self.screen, self.tanks, self.scoreboard)
             pygame.display.flip()
-            self.clock.tick(60)
+            self.clock.tick(Settings.FPS)
         pygame.quit()
