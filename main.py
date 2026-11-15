@@ -35,4 +35,5 @@ class Main:
         game = Game()
         game.run()
 
-Main()  # Start the game when this file is run directly
+if __name__ == "__main__":
+    Main()  # Start the game when this file is run directly
