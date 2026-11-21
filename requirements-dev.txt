@@ -1,0 +1,2 @@
+pyinstaller   # build the app:   ./build_app.sh
+numpy         # only for tools/make_audio.py (regenerate sounds + music)

@@ -44,18 +44,20 @@
 # =====================================================================
 
 
-MATCH_TIME = 120
+MATCH_TIME = 240            # seconds per Team Deathmatch (scoreboard.time_left uses this)
 TANK_MAX_HEALTH = 100
 class Settings:
-    SCREEN_WIDTH = 800
-    SCREEN_HEIGHT = 600
+    TITLE = "Drift Tank"
+    SCREEN_WIDTH = 1280         # logical size; the window scales to any size
+    SCREEN_HEIGHT = 720
     FPS = 60
-    TILE_SIZE = 40
+    TILE_SIZE = 32              # map grid: 48 x 36 tiles (world pixels per tile)
+    PIXEL_SCALE = 2             # pixel art: the world is drawn small, then scaled up 2x
     BACKGROUND_COLOR = (50, 50, 50)
     WALL_COLOR = (100, 100, 100)
     DESTRUCTIBLE_WALL_COLOR = (150, 75, 0)
     PLAYER_COLORS = [(255, 0, 0), (0, 0, 255), (0, 255, 0), (255, 255, 0)]
-    TANK_SPEED = 3
+    TANK_SPEED = 1.8
     TANK_SIZE = (40, 40)
     TANK_MAX_HEALTH = 100
     TANK_SHOOT_COOLDOWN = 500
@@ -67,3 +69,21 @@ class Settings:
     POWERUP_DURATION = 5000
     MAX_POWERUPS_ON_MAP = 3
     MATCH_TIME_LIMIT = 300
+
+    # --- loot & weapons ---
+    KILL_LIMIT = 15             # Team Deathmatch: first TEAM to this many kills wins
+    RESPAWN_MS = 3000           # a destroyed tank comes back after this long (unarmed!)
+    SPAWN_SHIELD_MS = 2000      # can't be hurt right after spawning
+    CRATE_SPAWN_MS = 3500       # a new loot crate drops this often...
+    MAX_CRATES = 9              # ...up to this many on the map
+    HEALTH_CRATE_HEAL = 40
+    TANK_GRIP = 0.14            # 0-1: lower = more drift
+    ICE_GRIP = 0.035
+
+    # --- Battleground: the safe zone shrinks every ~minute ---
+    # (seconds to wait, seconds to shrink, new radius in world px, damage per second outside)
+    ZONE_STAGES = [(35, 15, 620, 4), (30, 15, 420, 6), (25, 15, 260, 9), (20, 12, 140, 13), (15, 12, 50, 18), (10, 10, 0, 25)]
+
+    # --- online ---
+    GAME_PORT = 5555            # laptops join here
+    PHONE_PORT = 8080           # phones open http://<host ip>:8080
