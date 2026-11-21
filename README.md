@@ -1,14 +1,25 @@
 # 🎮 Drift Tank
 
-A local-multiplayer tank game built with Python and Pygame. 2–4 players share one
-keyboard, drive tanks around a walled arena, shoot each other, blow up walls, grab
-power-ups. Last tank standing wins. Built by a team of 4 as a first collaborative
-project — **and built to learn**: we write the code ourselves and use AI only as a tutor.
+A 3/4 top-down **pixel-art tank battle** built with Python and Pygame: loot crates with random
+limited-ammo weapons, drifting tanks, randomly generated (but fair) maps, **Battleground** (shrinking
+zone, last tank standing) and **Team Deathmatch** modes, bots, and **LAN multiplayer** — other laptops
+join over Wi-Fi and **phones work as controllers** in the browser. Built by a team of 4 as a first
+collaborative project.
+
+> 📖 **New here? Read [docs/CODEBASE_GUIDE.md](docs/CODEBASE_GUIDE.md)** — the whole codebase,
+> who built what, and how the multiplayer works, explained step by step.
 
 ## 🕹️ How to Play
-- **Player 1:** WASD to move, SPACE to shoot
-- **Player 2:** Arrow keys to move, ENTER to shoot
-- Last tank alive (or most kills when the timer ends) wins.
+- **Drive:** WASD or ARROW keys
+- **Aim:** MOUSE, or Q/E or J/K to turn the barrel
+- **Fire:** SPACE or LEFT CLICK · **Pause:** ESC · **Fullscreen:** F11
+- Drive over loot crates to get a weapon. Ammo runs out — find the next crate!
+
+```bash
+.venv/bin/python main.py                    # menu
+.venv/bin/python main.py join 192.168.1.5   # join a host on the same Wi-Fi
+./build_app.sh                              # build "Drift Tank.app"
+```
 
 ## 📁 File Tree — 4 parts, one per person
 

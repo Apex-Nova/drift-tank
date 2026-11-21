@@ -1,22 +1,14 @@
 """Combat package: bullets, collision handling, and visual effects."""
 
 from .bullet import Bullet
-from .collisions import (
-    handle_bullet_tank_collisions,
-    handle_bullet_wall_collisions,
-    rect_touches_wall,
-    resolve_collisions,
-)
-from .effects import Explosion, draw_effects, spawn_explosion, update_effects
+from .collisions import bullets_vs_walls, bullets_vs_tanks, rect_touches_wall
+from .effects import Explosion, EffectManager
 
 __all__ = [
     "Bullet",
-    "Explosion",
-    "draw_effects",
-    "handle_bullet_tank_collisions",
-    "handle_bullet_wall_collisions",
+    "bullets_vs_walls",
+    "bullets_vs_tanks",
     "rect_touches_wall",
-    "resolve_collisions",
-    "spawn_explosion",
-    "update_effects",
+    "Explosion",
+    "EffectManager",
 ]

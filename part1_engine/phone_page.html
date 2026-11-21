@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#14161d">
+<title>Drift Tank Controller</title>
+<style>
+  :root { --team: #e0403a; --bg: #14161d; --panel: #1f2330; --text: #f2f4fa; --muted: #9aa3b8; }
+  * { box-sizing: border-box; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); overflow: hidden;
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif; touch-action: none; }
+  #top { position: absolute; top: 0; left: 0; right: 0; padding: max(10px, env(safe-area-inset-top)) 16px 10px;
+    display: flex; align-items: center; gap: 12px; background: linear-gradient(#000a, #0000); z-index: 2; }
+  #badge { width: 38px; height: 38px; border-radius: 10px; background: var(--team); display: grid; place-items: center;
+    font-weight: 900; font-size: 18px; box-shadow: 0 0 18px var(--team); flex: none; }
+  #info { flex: 1; min-width: 0; }
+  #hpbar { height: 12px; border-radius: 6px; background: #0008; overflow: hidden; border: 1px solid #fff2; }
+  #hp { height: 100%; width: 100%; background: linear-gradient(90deg, #4ade80, #22c55e); transition: width .15s; }
+  #line2 { display: flex; justify-content: space-between; margin-top: 5px; font-size: 13px; color: var(--muted); }
+  #weapon { color: var(--text); font-weight: 700; }
+  #kills { font-weight: 800; font-size: 18px; flex: none; }
+  .stick { position: absolute; bottom: 0; top: 0; width: 50%; }
+  #left { left: 0; } #right { right: 0; }
+  .base { position: absolute; width: 150px; height: 150px; border-radius: 50%; border: 2px solid #fff3;
+    background: radial-gradient(#fff1, #fff0 70%); transform: translate(-50%, -50%); display: none; pointer-events: none; }
+  .knob { position: absolute; width: 64px; height: 64px; border-radius: 50%; background: #fff3; border: 2px solid #fff8;
+    left: 50%; top: 50%; transform: translate(-50%, -50%); }
+  #right .knob { background: color-mix(in srgb, var(--team) 60%, transparent); }
+  .hint { position: absolute; bottom: max(18px, env(safe-area-inset-bottom)); font-size: 12px; color: var(--muted);
+    letter-spacing: .08em; text-transform: uppercase; pointer-events: none; }
+  #left .hint { left: 18px; } #right .hint { right: 18px; text-align: right; }
+  #fire { position: absolute; right: 26px; bottom: 70px; width: 92px; height: 92px; border-radius: 50%;
+    background: var(--team); border: 4px solid #fff6; font-weight: 900; font-size: 16px; color: #fff;
+    display: grid; place-items: center; z-index: 3; box-shadow: 0 6px 0 #0006; }
+  #fire.down { transform: translateY(4px); box-shadow: 0 2px 0 #0006; filter: brightness(1.2); }
+  #overlay { position: absolute; inset: 0; display: grid; place-items: center; background: #000c; z-index: 5;
+    text-align: center; padding: 24px; }
+  #overlay h1 { margin: 0 0 8px; font-size: 28px; letter-spacing: .04em; }
+  #overlay p { color: var(--muted); margin: 6px 0 18px; }
+  #overlay button, #name { font: inherit; font-size: 18px; padding: 14px 26px; border-radius: 12px; border: none; }
+  #overlay button { background: var(--team); color: #fff; font-weight: 800; }
+  #name { background: var(--panel); color: var(--text); margin-bottom: 12px; width: 220px; text-align: center; }
+  #dead { position: absolute; inset: 0; display: none; place-items: center; font-size: 26px; font-weight: 900;
+    background: #a0101055; z-index: 1; pointer-events: none; }
+  #rotate { display: none; }
+  @media (orientation: portrait) { #rotate { display: grid; position: absolute; inset: 0; z-index: 9; background: var(--bg);
+    place-items: center; text-align: center; padding: 30px; font-size: 20px; } }
+</style>
+</head>
+<body>
+<div id="top">
+  <div id="badge">?</div>
+  <div id="info">
+    <div id="hpbar"><div id="hp"></div></div>
+    <div id="line2"><span id="weapon">Connecting…</span><span id="ammo"></span></div>
+  </div>
+  <div id="kills">0</div>
+</div>
+<div class="stick" id="left"><div class="base"><div class="knob"></div></div><div class="hint">drive</div></div>
+<div class="stick" id="right"><div class="base"><div class="knob"></div></div><div class="hint">aim · push far to fire</div></div>
+<div id="fire">FIRE</div>
+<div id="dead">DESTROYED</div>
+<div id="overlay">
+  <div>
+    <h1>DRIFT TANK</h1>
+    <p>Your phone is the controller. Watch the big screen!</p>
+    <input id="name" maxlength="12" placeholder="Your name"><br>
+    <button id="join">JOIN BATTLE</button>
+  </div>
+</div>
+<div id="rotate">↻ Turn your phone sideways</div>
+<script>
+const state = { mx: 0, my: 0, ax: 0, ay: 0, fire: false };
+let ws = null, myId = null, lastHp = null;
+const $ = id => document.getElementById(id);
+
+function setupStick(zone, onMove) {
+  const base = zone.querySelector('.base'), knob = zone.querySelector('.knob');
+  let touchId = null, cx = 0, cy = 0; const R = 60;
+  zone.addEventListener('pointerdown', e => {
+    if (touchId !== null) return;
+    touchId = e.pointerId; zone.setPointerCapture(e.pointerId);
+    const r = zone.getBoundingClientRect(); cx = e.clientX - r.left; cy = e.clientY - r.top;
+    base.style.left = cx + 'px'; base.style.top = cy + 'px'; base.style.display = 'block';
+    knob.style.left = '50%'; knob.style.top = '50%'; onMove(0, 0);
+  });
+  zone.addEventListener('pointermove', e => {
+    if (e.pointerId !== touchId) return;
+    const r = zone.getBoundingClientRect();
+    let dx = e.clientX - r.left - cx, dy = e.clientY - r.top - cy;
+    const d = Math.hypot(dx, dy); if (d > R) { dx *= R / d; dy *= R / d; }
+    knob.style.left = (75 + dx) + 'px'; knob.style.top = (75 + dy) + 'px';
+    onMove(dx / R, dy / R);
+  });
+  const end = e => { if (e.pointerId !== touchId) return; touchId = null; base.style.display = 'none'; onMove(0, 0); };
+  zone.addEventListener('pointerup', end); zone.addEventListener('pointercancel', end);
+}
+setupStick($('left'), (x, y) => { state.mx = x; state.my = y; });
+setupStick($('right'), (x, y) => { state.ax = x; state.ay = y; });
+const fire = $('fire');
+fire.addEventListener('pointerdown', e => { e.stopPropagation(); state.fire = true; fire.classList.add('down'); });
+const fireUp = () => { state.fire = false; fire.classList.remove('down'); };
+fire.addEventListener('pointerup', fireUp); fire.addEventListener('pointercancel', fireUp); fire.addEventListener('pointerleave', fireUp);
+
+function connect() {
+  ws = new WebSocket('ws://' + location.host + '/ws');
+  ws.onopen = () => { $('weapon').textContent = 'Connected!'; };
+  ws.onclose = () => { $('weapon').textContent = 'Disconnected — retrying…'; setTimeout(connect, 1500); };
+  ws.onmessage = ev => {
+    const m = JSON.parse(ev.data);
+    if (m.t === 'welcome') { myId = m.id; $('badge').textContent = m.id; }
+    if (m.t === 'full') { $('weapon').textContent = 'Game is full (4 players)'; }
+    if (m.t === 'status') {
+      const c = 'rgb(' + m.color.join(',') + ')';
+      document.documentElement.style.setProperty('--team', c);
+      $('badge').textContent = m.id;
+      $('hp').style.width = Math.max(0, 100 * m.hp / m.max) + '%';
+      $('weapon').textContent = m.weapon ? m.weapon : 'NO WEAPON — grab a crate!';
+      $('ammo').textContent = m.weapon ? m.ammo + ' shots' : '';
+      $('kills').textContent = m.kills + ' ☠';
+      $('dead').style.display = m.alive ? 'none' : 'grid';
+      if (lastHp !== null && m.hp < lastHp && navigator.vibrate) navigator.vibrate(m.alive ? 60 : [200, 80, 200]);
+      lastHp = m.hp;
+    }
+  };
+}
+$('name').value = localStorage.getItem('dt_name') || '';
+$('join').addEventListener('click', () => {
+  const name = $('name').value.trim(); localStorage.setItem('dt_name', name); state.name = name;
+  $('overlay').style.display = 'none';
+  const el = document.documentElement;
+  if (el.requestFullscreen) el.requestFullscreen().catch(() => {});
+  if (screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(() => {});
+  connect();
+});
+setInterval(() => { if (ws && ws.readyState === 1) ws.send(JSON.stringify(state)); }, 33);
+</script>
+</body>
+</html>
