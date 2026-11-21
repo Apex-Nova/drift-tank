@@ -13,13 +13,20 @@ collaborative project.
 - **Drive:** WASD or ARROW keys
 - **Aim:** MOUSE, or Q/E or J/K to turn the barrel
 - **Fire:** SPACE or LEFT CLICK · **Pause:** ESC · **Fullscreen:** F11
+- **Phone / tablet:** left thumb stick drives, right thumb stick aims — push it to the edge to fire, **II** pauses
 - Drive over loot crates to get a weapon. Ammo runs out — find the next crate!
+
+**Versions:** Mac app · Windows app · Android app · Web (play in the browser, also on phones).
+Online play (host/join) is in the Mac and Windows apps; the web and Android versions are you vs bots.
 
 ```bash
 .venv/bin/python main.py                    # menu
 .venv/bin/python main.py join 192.168.1.5   # join a host on the same Wi-Fi
 ./build_app.sh                              # build "Drift Tank.app"
+./build_web.sh serve                        # web version -> http://localhost:8000
 ```
+Windows, Android and web builds are made by GitHub Actions: push a tag like `v1.1`
+(see [.github/workflows/release.yml](.github/workflows/release.yml)).
 
 ## 📁 File Tree — 4 parts, one per person
 

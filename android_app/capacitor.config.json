@@ -1,0 +1,12 @@
+{
+  "appId": "com.drifttank.game",
+  "appName": "Drift Tank",
+  "webDir": "www",
+  "server": {
+    "hostname": "drifttank.app",
+    "androidScheme": "https"
+  },
+  "android": {
+    "backgroundColor": "#14182c"
+  }
+}

@@ -6,6 +6,8 @@
 # =====================================================================
 import random
 
+import sys
+
 import pygame
 
 from shared.settings import Settings
@@ -98,14 +100,23 @@ class MainMenu:
         self.message = message
         self.message_until = pygame.time.get_ticks() + 5000
         x, y = 70, 300
-        self.menu = ui.ButtonList([
-            ui.Button("PLAY", (x, y, 330, 62), "local", "primary", sub="you vs bots"),
-            ui.Button("HOST ONLINE", (x, y + 76, 330, 54), "host", "ghost", sub="laptops + phones on your Wi-Fi"),
-            ui.Button("JOIN GAME", (x, y + 140, 330, 54), "join", "ghost", sub="connect to a host"),
-            ui.Button("HOW TO PLAY", (x, y + 204, 158, 46), "help", "ghost", size=15),
-            ui.Button("SETTINGS", (x + 172, y + 204, 158, 46), "settings", "ghost", size=15),
-            ui.Button("QUIT", (x, y + 262, 330, 46), "quit", "ghost"),
-        ])
+        if sys.platform == "emscripten":
+            # Web version: a browser tab can't open network sockets or quit itself,
+            # so only single-player vs bots is offered.
+            self.menu = ui.ButtonList([
+                ui.Button("PLAY", (x, y, 330, 62), "local", "primary", sub="you vs bots"),
+                ui.Button("HOW TO PLAY", (x, y + 76, 158, 46), "help", "ghost", size=15),
+                ui.Button("SETTINGS", (x + 172, y + 76, 158, 46), "settings", "ghost", size=15),
+            ])
+        else:
+            self.menu = ui.ButtonList([
+                ui.Button("PLAY", (x, y, 330, 62), "local", "primary", sub="you vs bots"),
+                ui.Button("HOST ONLINE", (x, y + 76, 330, 54), "host", "ghost", sub="laptops + phones on your Wi-Fi"),
+                ui.Button("JOIN GAME", (x, y + 140, 330, 54), "join", "ghost", sub="connect to a host"),
+                ui.Button("HOW TO PLAY", (x, y + 204, 158, 46), "help", "ghost", size=15),
+                ui.Button("SETTINGS", (x + 172, y + 204, 158, 46), "settings", "ghost", size=15),
+                ui.Button("QUIT", (x, y + 262, 330, 46), "quit", "ghost"),
+            ])
 
     def handle_event(self, event):
         action = self.menu.handle_event(event)
@@ -293,7 +304,7 @@ class MapSelect:
         self.backdrop.draw(surf, darker=True)
         mouse = pygame.mouse.get_pos()
         ui.title_text(surf, "CHOOSE YOUR BATTLE", (W / 2, 70), 44)
-        sub = "You against the exact number of bots you pick (friends? use HOST ONLINE)" if self.mode == "local" else \
+        sub = ("You against the exact number of bots you pick" + ("" if sys.platform == "emscripten" else " (friends? use HOST ONLINE)")) if self.mode == "local" else \
             "You host. Friends join from laptops or phones on the same Wi-Fi. Bots fill empty slots."
         ui.text(surf, sub, (W / 2, 106), 14, ui.MUTED, kind="narrow", anchor="midtop")
         names = {"br": ("BATTLEGROUND", "1 life - shrinking zone - last one wins"),

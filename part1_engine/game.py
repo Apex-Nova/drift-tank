@@ -32,6 +32,7 @@ from part1_engine.view import Camera
 from part1_engine.tank import Tank
 from part1_engine.bot import Bot
 from part1_engine.network import Host, Client, get_lan_ip
+from part1_engine.touch import TouchControls
 from part1_engine import renderer
 from part2_combat.weapons import WEAPONS, WEAPON_ORDER, splash_targets
 from part2_combat.fx import FX
@@ -80,6 +81,7 @@ class Game:
         self.mouse_active = False
         self.mouse_pos = (0, 0)
         self.mouse_down = False
+        self.touch = TouchControls()        # on-screen sticks for phones / tablets
         self.fx = FX()
         self.events = []
         self.killfeed = []
@@ -275,19 +277,31 @@ class Game:
         inputs["shoot"] = inputs.get("shoot") or self.mouse_down
         return inputs
 
+    def local_inputs(self, keys, tank):
+        """This computer's player: keyboard + mouse, and touch sticks if a finger was used."""
+        inputs = self.mouse_aim(self.read_keys(keys, KEYS), tank)
+        if self.touch.active:
+            touch = self.touch.inputs()
+            if touch["move_x"] or touch["move_y"]:
+                inputs["move_x"], inputs["move_y"] = touch["move_x"], touch["move_y"]
+            if touch["aim_angle"] is not None:
+                inputs["aim_angle"] = touch["aim_angle"]
+            inputs["shoot"] = inputs.get("shoot") or touch["shoot"]
+        return inputs
+
     def collect_inputs(self):
         keys = pygame.key.get_pressed()
         all_inputs = {}
         if self.mode == "local" and not self.paused:
-            all_inputs[1] = self.mouse_aim(self.read_keys(keys, KEYS), self.find_tank(1))
+            all_inputs[1] = self.local_inputs(keys, self.find_tank(1))
         elif self.mode == "host":
             if not self.paused:
-                all_inputs[1] = self.mouse_aim(self.read_keys(keys, KEYS), self.find_tank(1))
+                all_inputs[1] = self.local_inputs(keys, self.find_tank(1))
             for player_id, inputs in list(self.network.inputs.items()):
                 all_inputs[player_id] = inputs
         elif self.mode == "join":
             mine = self.find_tank(self.my_id)
-            inputs = {} if self.paused else self.mouse_aim(self.read_keys(keys, KEYS), mine)
+            inputs = {} if self.paused else self.local_inputs(keys, mine)
             self.network.send_inputs(inputs)
         if not (self.paused and self.mode == "local"):
             for player_id, bot in self.bots.items():
@@ -735,6 +749,19 @@ class Game:
     #  App screen interface
     # ------------------------------------------------------------------
     def handle_event(self, event):
+        if self.touch.handle_event(event):
+            if self.touch.pause_tapped:
+                self.touch.pause_tapped = False
+                if self.phase != "over":
+                    self.paused = not self.paused
+                    self.touch.release_all()
+                    play_sound("click")
+            return
+        if getattr(event, "touch", False) and event.type in (pygame.MOUSEMOTION, pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP):
+            # a finger also sends a fake mouse event: only use it to tap HUD buttons
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                game_hud.handle_click(self, event.pos)
+            return
         if event.type == pygame.MOUSEMOTION:
             self.mouse_pos = event.pos
             self.mouse_active = True
@@ -771,6 +798,8 @@ class Game:
     def draw(self, surface):
         renderer.draw_world(self, surface)
         game_hud.draw(self, surface)
+        if self.phase != "over" and not self.paused:
+            self.touch.draw(surface)
 
     def join_info(self):
         if self.mode != "host" or self.network is None:

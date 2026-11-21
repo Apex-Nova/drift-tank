@@ -1,0 +1,11 @@
+{
+  "name": "drift-tank-android",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Wraps the web version of Drift Tank (build_web.sh) into an Android app with Capacitor. Built by .github/workflows/release.yml",
+  "dependencies": {
+    "@capacitor/android": "^7.0.0",
+    "@capacitor/cli": "^7.0.0",
+    "@capacitor/core": "^7.0.0"
+  }
+}

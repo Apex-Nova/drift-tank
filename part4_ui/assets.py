@@ -180,6 +180,8 @@ def play_music(name, loop=True, fade_ms=800):
         return
     path = os.path.join(ASSET_DIR, "music", name + ".wav")
     if not os.path.exists(path):
+        path = path[:-4] + ".ogg"          # web build ships smaller .ogg files
+    if not os.path.exists(path):
         return
     try:
         pygame.mixer.music.load(path)

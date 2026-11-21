@@ -7,6 +7,8 @@
 # every frame. The window can be resized or made fullscreen (F11); the game
 # always draws at 1280 x 720 and pygame scales it to fit.
 # =====================================================================
+import sys
+
 import pygame
 
 from shared.settings import Settings
@@ -19,8 +21,10 @@ class App:
         pygame.init()
         self.prefs = load_prefs()
         pygame.display.set_caption(Settings.TITLE)
-        self.window = pygame.display.set_mode((Settings.SCREEN_WIDTH, Settings.SCREEN_HEIGHT),
-                                              pygame.SCALED | pygame.RESIZABLE)
+        # On desktop pygame scales the 1280x720 picture to the window (SCALED).
+        # In a browser the page already scales the canvas, so SCALED would double it.
+        flags = 0 if sys.platform == "emscripten" else pygame.SCALED | pygame.RESIZABLE
+        self.window = pygame.display.set_mode((Settings.SCREEN_WIDTH, Settings.SCREEN_HEIGHT), flags)
         try:
             icon = assets.get_image("icon") if assets.has_image("icon") else assets.get_image("tank_red")
             pygame.display.set_icon(icon)
@@ -84,32 +88,57 @@ class App:
         else:
             assets.play_music("menu")
 
-    def run(self):
+    def step(self):
+        """One frame: events -> update -> draw. Returns False when the app should close."""
         from part4_ui.screens import MainMenu
         from part1_engine.game import Game
-        while self.running:
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    self.running = False
-                elif event.type == pygame.KEYDOWN and event.key == pygame.K_F11:
-                    self.prefs["fullscreen"] = not self.prefs.get("fullscreen", False)
-                    self.set_fullscreen(self.prefs["fullscreen"])
-                    save_prefs(self.prefs)
-                else:
-                    self.screen.handle_event(event)
-            self.screen.update_screen()
-            self.update_music()
-            if isinstance(self.screen, Game) and not self.screen.running:
-                message = self.screen.result[1] if self.screen.result else None
-                self.screen.close()
-                self.go(MainMenu(self, message))
-                continue
-            self.screen.draw(self.window)
-            if self.prefs.get("show_fps"):
-                font = assets.get_font(12, "narrow")
-                self.window.blit(font.render("%d FPS" % self.clock.get_fps(), True, (255, 255, 255)), (6, 700))
-            pygame.display.flip()
-            self.clock.tick(Settings.FPS)
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                self.running = False
+            elif event.type == pygame.KEYDOWN and event.key == pygame.K_F11:
+                self.prefs["fullscreen"] = not self.prefs.get("fullscreen", False)
+                self.set_fullscreen(self.prefs["fullscreen"])
+                save_prefs(self.prefs)
+            else:
+                self.screen.handle_event(event)
+                for fake in self.touch_as_mouse(event):
+                    self.screen.handle_event(fake)
+        self.screen.update_screen()
+        self.update_music()
+        if isinstance(self.screen, Game) and not self.screen.running:
+            message = self.screen.result[1] if self.screen.result else None
+            self.screen.close()
+            self.go(MainMenu(self, message))
+            return self.running
+        self.screen.draw(self.window)
+        if self.prefs.get("show_fps"):
+            font = assets.get_font(12, "narrow")
+            self.window.blit(font.render("%d FPS" % self.clock.get_fps(), True, (255, 255, 255)), (6, 700))
+        pygame.display.flip()
+        self.clock.tick(Settings.FPS)
+        return self.running
+
+    def touch_as_mouse(self, event):
+        """In a browser a finger tap doesn't make a mouse click, so menus would ignore it.
+        Make the click ourselves (marked touch=True so the Game knows it came from a finger)."""
+        if sys.platform != "emscripten" or event.type not in (pygame.FINGERDOWN, pygame.FINGERUP):
+            return []
+        pos = (int(event.x * Settings.SCREEN_WIDTH), int(event.y * Settings.SCREEN_HEIGHT))
+        if event.type == pygame.FINGERDOWN:
+            return [pygame.event.Event(pygame.MOUSEMOTION, pos=pos, rel=(0, 0), buttons=(0, 0, 0), touch=True),
+                    pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=pos, button=1, touch=True)]
+        return [pygame.event.Event(pygame.MOUSEBUTTONUP, pos=pos, button=1, touch=True)]
+
+    def quit(self):
+        from part1_engine.game import Game
         if isinstance(self.screen, Game):
             self.screen.close()
         pygame.quit()
+
+    async def run(self):
+        """The main loop. It is async so the same code runs in a web browser (pygbag):
+        `await asyncio.sleep(0)` hands control back to the browser once per frame."""
+        import asyncio
+        while self.step():
+            await asyncio.sleep(0)
+        self.quit()
