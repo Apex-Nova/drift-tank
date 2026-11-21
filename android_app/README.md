@@ -6,3 +6,7 @@ made with [Capacitor](https://capacitorjs.com). GitHub Actions builds it for you
 
 `server.hostname` is set to `drifttank.app` because the web runtime (pygbag)
 treats a page on `localhost` as a local test server and would look for files there.
+
+`prepare_www.sh` copies the web build into `www/`. It renames `drift-tank.tar.gz`
+to `drift-tank.tgzdata` because Android's packaging tool unpacks every `.gz` file
+and drops the extension, which left the game stuck on "Loading".
