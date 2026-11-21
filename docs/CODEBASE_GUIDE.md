@@ -50,6 +50,21 @@ Build the Mac app (Windows: run the same script on a Windows PC):
 ```bash
 ./build_app.sh        # -> dist/Drift Tank.app
 ```
+Web version (pygbag compiles Python + Pygame to WebAssembly so it runs in a browser):
+```bash
+./build_web.sh serve  # test at http://localhost:8000   (./build_web.sh alone = build only)
+```
+How the web/phone versions work:
+- `App.run()` is **async**: each frame ends with `await asyncio.sleep(0)`, which hands control
+  back to the browser (a browser tab can't run a never-ending `while` loop).
+- `part1_engine/touch.py` draws two thumb sticks and turns fingers into the same inputs dict
+  the keyboard makes. In a browser a finger tap doesn't create a mouse click, so `App.touch_as_mouse`
+  makes one, which lets the menus work with taps.
+- The browser can't open LAN sockets, so the web/Android menu hides HOST/JOIN (you vs bots).
+- The **Android app** (`android_app/`) is the web version inside an Android WebView (Capacitor).
+- **Windows / Android / web** are built on GitHub's computers by `.github/workflows/release.yml`
+  when you push a tag like `v1.1`.
+
 Regenerate all sounds + music:
 ```bash
 .venv/bin/python tools/make_audio.py

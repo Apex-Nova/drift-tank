@@ -213,6 +213,8 @@ def draw(game, surf):
         line = "LAPTOPS JOIN:  %s" % ip + ("      PHONES OPEN:  %s" % phone if phone else "")
     elif game.mode == "local" and now - game.match_start < 6000 and game.phase != "over":
         line = "WASD / ARROWS drive      MOUSE or Q/E, J/K aim      SPACE / CLICK fire"
+        if game.touch.active:
+            line = "LEFT STICK drive      RIGHT STICK aim - push to the edge to fire"
     if line:
         img = get_font(13, "narrow").render(line, True, ui.TEXT)
         box = ui.panel(surf, (sw / 2 - img.get_width() / 2 - 14, sh - 36, img.get_width() + 28, 26), alpha=190, radius=8)

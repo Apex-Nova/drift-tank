@@ -12,8 +12,12 @@
 #   python main.py host            -> straight to map select (host online)
 #   python main.py join <host IP>  -> join a game hosted on the same Wi-Fi
 #   Phones: open  http://<host IP>:8080  while someone is hosting.
+#   Web:    ./build_web.sh  (browser version, single player vs bots)
 # =====================================================================
+import asyncio
 import sys
+
+import pygame  # noqa: F401  (imported here so the web builder (pygbag) knows to ship pygame)
 
 
 class Main:
@@ -24,8 +28,9 @@ class Main:
         if mode not in (None, "local", "host", "join") or (mode == "join" and not host_ip):
             print("Usage: python main.py [local | host | join <host IP>]")
             return
-        App(mode, host_ip).run()
+        asyncio.run(App(mode, host_ip).run())
 
 
-if __name__ == "__main__":
-    Main()  # Start the game when this file is run directly
+# No `if __name__ == "__main__":` guard on purpose: the web version (pygbag)
+# runs this file as a module, and it must still start the game.
+Main()
