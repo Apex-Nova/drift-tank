@@ -123,12 +123,13 @@ class MainMenu:
             ])
         else:
             self.menu = ui.ButtonList([
-                ui.Button("PLAY", (x, y, 330, 62), "local", "primary", sub="you vs bots"),
-                ui.Button("HOST ONLINE", (x, y + 76, 330, 54), "host", "ghost", sub="laptops + phones on your Wi-Fi"),
-                ui.Button("JOIN GAME", (x, y + 140, 330, 54), "join", "ghost", sub="connect to a host"),
-                ui.Button("HOW TO PLAY", (x, y + 204, 158, 46), "help", "ghost", size=15),
-                ui.Button("SETTINGS", (x + 172, y + 204, 158, 46), "settings", "ghost", size=15),
-                ui.Button("QUIT", (x, y + 262, 330, 46), "quit", "ghost"),
+                ui.Button("PLAY", (x, y - 20, 330, 62), "local", "primary", sub="you vs bots"),
+                ui.Button("HOST ONLINE", (x, y + 56, 330, 54), "host_online", "ghost", sub="room code - play with anyone"),
+                ui.Button("HOST ON WI-FI", (x, y + 120, 330, 54), "host", "ghost", sub="laptops + phones nearby"),
+                ui.Button("JOIN GAME", (x, y + 184, 330, 54), "join", "ghost", sub="room code or host IP"),
+                ui.Button("HOW TO PLAY", (x, y + 248, 158, 46), "help", "ghost", size=15),
+                ui.Button("SETTINGS", (x + 172, y + 248, 158, 46), "settings", "ghost", size=15),
+                ui.Button("QUIT", (x, y + 304, 330, 46), "quit", "ghost"),
             ])
 
     def handle_event(self, event):
@@ -367,7 +368,7 @@ class JoinScreen:
         self.app = app
         self.backdrop = app.backdrop()
         self.ip = ui.TextInput((W / 2 - 220, 300, 440, 60), app.prefs.get("last_ip", ""),
-                               "e.g. 48213" if web.IS_WEB else "e.g. 192.168.1.5",
+                               "e.g. 48213  or  192.168.1.5",
                                allowed="0123456789.", max_len=15)
         self.name = ui.TextInput((W / 2 - 220, 410, 440, 60), app.prefs.get("name", ""), "your name (optional)",
                                  max_len=12)
@@ -418,9 +419,8 @@ class JoinScreen:
                 self.app.go(MainMenu(self.app))
 
     def connect(self):
-        if not (self.ip.value.count(".") == 3 or (web.IS_WEB and web.is_room_code(self.ip.value))):
-            hint = "Type the 5-digit room code (or a Wi-Fi host's IP)" if web.IS_WEB else \
-                "Type the IP shown on the host's screen (like 192.168.1.5)"
+        if not (self.ip.value.count(".") == 3 or web.is_room_code(self.ip.value)):
+            hint = "Type the 5-digit room code (or a Wi-Fi host's IP like 192.168.1.5)"
             self.status = (hint, (255, 140, 120))
             play_sound("empty")
             return
@@ -459,10 +459,9 @@ class JoinScreen:
         now = pygame.time.get_ticks()
         self.backdrop.draw(surf, darker=True)
         ui.title_text(surf, "JOIN A GAME", (W / 2, 110), 48)
-        tip = "Type the 5-digit ROOM CODE shown on the host's screen (or a Wi-Fi host's IP)." if web.IS_WEB else \
-            "Both computers must be on the same Wi-Fi (or the same phone hotspot)."
+        tip = "Type the 5-digit ROOM CODE from the host's screen  -  or, on the same Wi-Fi, the host's IP."
         ui.text(surf, tip, (W / 2, 170), 15, ui.MUTED, kind="narrow", anchor="midtop")
-        ui.text(surf, "ROOM CODE / HOST IP" if web.IS_WEB else "HOST IP", (W / 2 - 220, self.ip.rect.y - 30), 16, ui.ACCENT)
+        ui.text(surf, "ROOM CODE / HOST IP", (W / 2 - 220, self.ip.rect.y - 30), 16, ui.ACCENT)
         self.ip.draw(surf, now)
         if self.keypad:
             for key, rect in self.keypad:

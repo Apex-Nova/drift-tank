@@ -18,11 +18,13 @@ collaborative project.
 
 **Versions:** Mac app · Windows app · Android app · Web (play in the browser, also on phones).
 **Online play:**
-- **Room codes (internet, anywhere):** on the website and in the Android app, *HOST ONLINE* gives a
+- **Room codes (internet, anywhere):** in every version (Mac, Windows, Android, website), *HOST ONLINE* gives a
   5-digit code; friends tap *JOIN GAME* and type it. Messages go through a tiny relay server
   ([server/](server/)), the host's device runs the match.
 - **Same Wi-Fi:** the Mac, Windows and Android apps can host on the local network; laptops join with
   the host's IP, phones can also open `http://<host IP>:8080` as a controller.
+  (The website can't do Wi-Fi play: browsers block web pages from reaching devices on your network.)
+- **Waiting room:** hosting opens a lobby. Players join and press *READY*; the host presses *START*.
 
 ```bash
 .venv/bin/python main.py                    # menu

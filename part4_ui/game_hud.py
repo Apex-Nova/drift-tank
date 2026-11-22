@@ -31,6 +31,10 @@ def handle_click(game, pos):
                 game.leave()
             elif action == "again":
                 game.start_match()
+            elif action == "start":
+                game.begin_match()
+            elif action == "ready":
+                game.toggle_ready()
             return True
     return False
 
@@ -208,7 +212,7 @@ def draw(game, surf):
     # ---- bottom: how to join / controls ----
     info = game.join_info()
     line = None
-    if info and game.phase != "over":
+    if info and game.phase not in ("over", "lobby"):
         ip, phone = info
         line = "LAPTOPS JOIN:  %s" % ip + ("      PHONES OPEN:  %s" % phone if phone else "")
         if getattr(game.network, "online", False) and ip[:1].isdigit():
@@ -224,7 +228,9 @@ def draw(game, surf):
         box = ui.panel(surf, (sw / 2 - img.get_width() / 2 - 14, sh - 36, img.get_width() + 28, 26), alpha=190, radius=8)
         surf.blit(img, (box.x + 14, box.y + 6))
 
-    if game.phase == "over":
+    if game.phase == "lobby":
+        _lobby(game, surf)
+    elif game.phase == "over":
         _game_over(game, surf)
     elif game.paused:
         _pause(game, surf)
@@ -253,6 +259,56 @@ def _pause(game, surf):
         ui.text(surf, "(online games keep running)", (sw / 2, sh / 2 - 70), 13, ui.MUTED, kind="narrow", anchor="midtop")
     _button(surf, "RESUME", pygame.Rect(sw / 2 - 150, sh / 2 - 30, 300, 56), "resume", True)
     _button(surf, "MAIN MENU", pygame.Rect(sw / 2 - 150, sh / 2 + 45, 300, 56), "menu")
+
+
+def _lobby(game, surf):
+    """Waiting room: who is here, who is READY, and the START (host) / READY (joiner) button."""
+    _overlay(surf, 120)
+    sw, sh = surf.get_size()
+    rows = game.lobby_list() if game.mode == "host" else game.lobby
+    ui.title_text(surf, "WAITING ROOM", (sw / 2, 96), 50)
+    info = game.join_info()
+    if info:
+        ip, phone = info
+        if getattr(game.network, "online", False) and ip[:1].isdigit():
+            sub = "ROOM CODE  %s   -  friends tap JOIN GAME and type it" % ip
+        elif ip[:1].isdigit():
+            sub = "SAME WI-FI: JOIN GAME with  %s" % ip + ("     PHONE CONTROLLER: %s" % phone if phone else "")
+        else:
+            sub = ip
+        ui.text(surf, sub, (sw / 2, 140), 18, ui.ACCENT, kind="narrow", anchor="midtop")
+    else:
+        ui.text(surf, "Connected! Press READY, then wait for the host to start.", (sw / 2, 140), 18, ui.ACCENT,
+                kind="narrow", anchor="midtop")
+    panel = ui.panel(surf, (sw / 2 - 300, 186, 600, 64 + 52 * max(1, len(rows))))
+    ui.text(surf, "PLAYERS  %d / 4" % len(rows), (panel.x + 28, panel.y + 18), 15, ui.MUTED)
+    for i, (pid, name, ready, kind) in enumerate(rows):
+        y = panel.y + 52 + i * 52
+        color = art.tank_color(pid, game.rules == "tdm")
+        pygame.draw.rect(surf, color, (panel.x + 28, y + 6, 18, 18), border_radius=5)
+        label = name + ("  (you)" if pid == game.my_id else "") + ("  - HOST" if kind == "host" and name != "HOST" else "")
+        ui.text(surf, label, (panel.x + 60, y + 2), 21, ui.TEXT)
+        tag, tag_color = ("READY", ui.TEAL) if ready else ("NOT READY", ui.CORAL)
+        if kind == "bot":
+            tag, tag_color = "BOT", ui.MUTED
+        ui.text(surf, tag, (panel.right - 28, y + 4), 16, tag_color, anchor="topright")
+    y = panel.bottom + 26
+    if game.mode == "host":
+        waiting = [r[1] for r in rows if not r[2]]
+        if waiting:
+            ui.text(surf, "Waiting for %s to press READY..." % ", ".join(waiting), (sw / 2, y), 15, ui.MUTED,
+                    kind="narrow", anchor="midtop")
+        else:
+            _button(surf, "START MATCH", pygame.Rect(sw / 2 - 160, y, 320, 62), "start", True)
+        ui.text(surf, "Players can join until you press START. Bots fill empty slots.", (sw / 2, y + 76), 13,
+                ui.MUTED, kind="narrow", anchor="midtop")
+    else:
+        _button(surf, "READY!" if game.ready else "PRESS WHEN READY", pygame.Rect(sw / 2 - 170, y, 340, 62), "ready",
+                not game.ready)
+        if game.ready:
+            ui.text(surf, "You're ready - waiting for the host to start...", (sw / 2, y + 76), 14, ui.TEAL,
+                    kind="narrow", anchor="midtop")
+    _button(surf, "LEAVE", pygame.Rect(40, sh - 82, 150, 50), "menu")
 
 
 def _game_over(game, surf):

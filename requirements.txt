@@ -3,3 +3,4 @@
 # pygame-ce is the community edition of Pygame: same "import pygame",
 # but it supports new Python versions (3.13 / 3.14) that classic pygame may not.
 pygame-ce
+certifi      # trusted certificates for the online-rooms server (wss://)
