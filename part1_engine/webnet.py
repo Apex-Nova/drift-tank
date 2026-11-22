@@ -94,6 +94,8 @@ class WebClient:
         return events
 
     def send_inputs(self, inputs):
+        if not self.name:
+            self.name = web.cg_name()          # CrazyGames username (arrives a moment after start)
         if self.name:
             inputs = dict(inputs, name=self.name)
         text = json.dumps(inputs, separators=(",", ":"))

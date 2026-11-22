@@ -41,6 +41,7 @@ window.dtSfx = window.dtSfx || {
       .catch(() => {});
   },
   play(name, gain) {
+    if (window.dtCG && dtCG.muted) return;          // CrazyGames "mute audio" wins over game volume
     const ctx = this.context();
     if (!ctx) return;
     const buf = this.buffers[name];
@@ -70,7 +71,7 @@ window.dtMusic = window.dtMusic || {
   play(name, loop) {
     if (this.a) { this.a.onended = null; this.a.pause(); }
     const a = new Audio("music/" + name + AUDIO_EXT);
-    a.loop = loop; a.volume = this.vol; this.a = a;
+    a.loop = loop; a.volume = this.vol; this.a = a; this.applyMute();
     a.onended = () => { if (this.a === a && this.loopList && this.list.length) this.next(); };
     a.play().catch(() => {             // browsers only allow sound after the first tap/key
       const go = () => {
@@ -81,7 +82,60 @@ window.dtMusic = window.dtMusic || {
     });
   },
   stop() { if (this.a) { this.a.pause(); this.a = null; } },
-  volume(v) { this.vol = v; if (this.a) this.a.volume = v; }
+  volume(v) { this.vol = v; if (this.a) this.a.volume = v; this.applyMute(); },
+  applyMute() { if (this.a) this.a.muted = !!(window.dtCG && dtCG.muted); }
+};
+
+// ---- CrazyGames SDK (only present in the CrazyGames upload, see build_web.sh crazygames) ----
+window.dtCG = window.dtCG || {
+  ready: false, env: "", name: "", invite: null, pendingJoin: null, instant: false, muted: false,
+  playing: null, roomCode: null,
+  sdk() { return window.CrazyGames && window.CrazyGames.SDK; },
+  call(fn) { try { if (this.ready) fn(this.sdk()); } catch (e) { console.warn("CrazyGames SDK:", e); } },
+  init() {
+    const S = this.sdk();
+    if (!S || this.started) return;
+    this.started = true;
+    S.init().then(() => {
+      this.env = S.environment;
+      if (this.env !== "local" && this.env !== "crazygames") return;   // "disabled": never call the SDK
+      this.ready = true;
+      this.call(S => S.game.loadingStart());
+      this.instant = !!S.game.isInstantMultiplayer;
+      this.invite = S.game.getInviteParam("room");
+      const settings = S.game.settings || {};
+      this.muted = !!settings.muteAudio;
+      dtMusic.applyMute();
+      S.game.addSettingsChangeListener((s) => { this.muted = !!(s && s.muteAudio); dtMusic.applyMute(); });
+      S.game.addJoinRoomListener((params) => { if (params && params.room) this.pendingJoin = String(params.room); });
+      if (S.user && S.user.isUserAccountAvailable) {
+        S.user.getUser().then((u) => { if (u && u.username) this.name = u.username; }).catch(() => {});
+      }
+    }).catch((e) => console.warn("CrazyGames SDK init:", e));
+  },
+  loaded() { if (!this.loadDone) { this.loadDone = true; this.call(S => S.game.loadingStop()); } },
+  gameplay(on) {                     // gameplayStart / gameplayStop, only when it changes
+    if (this.playing === on) return;
+    this.playing = on;
+    this.call(S => on ? S.game.gameplayStart() : S.game.gameplayStop());
+  },
+  room(code, joinable) {             // tell CrazyGames which room we're in (enables Join / Invite)
+    if (code !== this.roomCode) {
+      this.roomCode = code;
+      this.call(S => S.game.showInviteButton({room: code}));
+    }
+    this.call(S => S.game.updateRoom({roomId: code, isJoinable: joinable, inviteParams: {room: code}}));
+  },
+  leftRoom() {
+    if (!this.roomCode) return;
+    this.roomCode = null;
+    this.call(S => { S.game.hideInviteButton(); S.game.leftRoom(); });
+  },
+  takeJoin() {                       // room code from an invite link (start-up) or the join listener
+    const code = this.pendingJoin || this.invite;
+    this.pendingJoin = null; this.invite = null;
+    return code || "";
+  }
 };
 
 window.dtNet = window.dtNet || {
@@ -195,6 +249,40 @@ def can_host():
     if _can_host is None:
         _can_host = IS_WEB and bool(js("dtNet.canHost()"))
     return _can_host
+
+
+# ---------------------------------------------------------------- CrazyGames
+# All of these do nothing unless the page loaded the CrazyGames SDK and it said we are on
+# CrazyGames (or testing on localhost). The GitHub website and Android app never load it.
+def cg_init():
+    if IS_WEB:
+        js("dtCG.init()")
+
+
+def cg_ready():
+    return IS_WEB and bool(js("dtCG.ready"))
+
+
+def cg_call(code):
+    if IS_WEB:
+        js(code)
+
+
+def cg_name():
+    return str(js("dtCG.name || ''")) if IS_WEB else ""
+
+
+def cg_take_join():
+    """Room code a CrazyGames invite asked us to join ('' if none)."""
+    return str(js("dtCG.ready ? dtCG.takeJoin() : ''")) if IS_WEB else ""
+
+
+def cg_instant():
+    """Opened from CrazyGames' 'play with friends': go straight into an online room."""
+    if not IS_WEB or not js("dtCG.ready && dtCG.instant"):
+        return False
+    js("dtCG.instant = false")
+    return True
 
 
 def relay_url():

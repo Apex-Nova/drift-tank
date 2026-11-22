@@ -14,6 +14,7 @@ import pygame
 from shared.settings import Settings
 from shared.resources import load_prefs, save_prefs
 from part4_ui import assets
+from shared import web
 
 
 class App:
@@ -36,6 +37,8 @@ class App:
             pass
         assets.init_sound()
         assets.preload_web_sounds()
+        web.cg_init()                       # CrazyGames SDK (only in the CrazyGames upload)
+        self.frames = 0
         assets.set_volume(self.prefs.get("volume", 0.7))
         assets.set_music_volume(self.prefs.get("music", 0.5))
         if self.prefs.get("fullscreen"):
@@ -78,7 +81,8 @@ class App:
         from part1_engine.game import Game
         try:
             game = Game(mode=mode, host_ip=host_ip, map_id=map_id, bots=bots, rules=rules, humans=humans, seed=seed,
-                        name=name or self.prefs.get("name", ""), prefs=self.prefs, network=network, online=online)
+                        name=name or self.prefs.get("name", "") or web.cg_name(), prefs=self.prefs, network=network,
+                        online=online)
         except ConnectionError as error:
             return str(error)
         except OSError as error:
@@ -120,6 +124,8 @@ class App:
             if self.screen is not screen_before:
                 break
         self.update_music()
+        if web.IS_WEB:
+            self.crazygames()
         if isinstance(self.screen, Game) and not self.screen.running:
             message = self.screen.result[1] if self.screen.result else None
             self.screen.close()
@@ -132,6 +138,33 @@ class App:
         pygame.display.flip()
         self.frame_ms = self.clock.tick(Settings.FPS)
         return self.running
+
+    def crazygames(self):
+        """CrazyGames: report loading/gameplay, open invite links, 'instant multiplayer'."""
+        from part1_engine.game import Game
+        from part4_ui.screens import JoinScreen
+        self.frames += 1
+        if self.frames == 20:
+            web.cg_call("dtCG.loaded()")                 # first screen is up: loading done
+        if self.frames % 10:
+            return
+        game = self.screen if isinstance(self.screen, Game) else None
+        playing = bool(game and game.mode != "demo" and game.phase in ("countdown", "playing") and not game.paused)
+        web.cg_call("dtCG.gameplay(%s)" % ("true" if playing else "false"))
+        if self.frames % 30 or not web.cg_ready():
+            return
+        code = web.cg_take_join()
+        if code:                                         # a friend's invite: join their room
+            if game is not None:
+                game.close()
+            screen = JoinScreen(self)
+            screen.ip.value = code
+            self.go(screen)
+            screen.connect()
+        elif game is None and web.cg_instant():          # "play with friends": host a room right away
+            from part3_world.maps import MAPS
+            import random
+            self.start_game("host", random.choice(MAPS)["id"], bots=0, online=True)
 
     def updates_this_frame(self):
         """The game logic is made for 60 updates a second. On desktop we draw 60 frames a second,
