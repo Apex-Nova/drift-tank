@@ -4,9 +4,11 @@
   "webDir": "www",
   "server": {
     "hostname": "drifttank.app",
-    "androidScheme": "https"
+    "androidScheme": "https",
+    "cleartext": true
   },
   "android": {
-    "backgroundColor": "#14182c"
+    "backgroundColor": "#14182c",
+    "allowMixedContent": true
   }
 }

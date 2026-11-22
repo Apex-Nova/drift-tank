@@ -10,3 +10,8 @@ treats a page on `localhost` as a local test server and would look for files the
 `prepare_www.sh` copies the web build into `www/`. It renames `drift-tank.tar.gz`
 to `drift-tank.tgzdata` because Android's packaging tool unpacks every `.gz` file
 and drops the extension, which left the game stuck on "Loading".
+
+**Hosting from the phone:** `native/DriftNetPlugin.java` is a tiny Capacitor plugin that opens
+port 5757 (laptops, JSON lines) and 8080 (phones: WebSocket, plus the controller page).
+`patch_android.sh` copies it (and `MainActivity.java`, which registers it) into the generated
+Android project, turns on landscape and allows plain `ws://` traffic on the local Wi-Fi.

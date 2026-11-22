@@ -211,6 +211,10 @@ def draw(game, surf):
     if info and game.phase != "over":
         ip, phone = info
         line = "LAPTOPS JOIN:  %s" % ip + ("      PHONES OPEN:  %s" % phone if phone else "")
+        if getattr(game.network, "online", False) and ip[:1].isdigit():
+            line = "ROOM CODE:  %s      friends: JOIN GAME and type this code" % ip
+        if not ip[:1].isdigit():                # "starting..." or an error message
+            line = "ONLINE: %s" % ip
     elif game.mode == "local" and now - game.match_start < 6000 and game.phase != "over":
         line = "WASD / ARROWS drive      MOUSE or Q/E, J/K aim      SPACE / CLICK fire"
         if game.touch.active:

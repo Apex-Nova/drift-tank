@@ -60,8 +60,24 @@ How the web/phone versions work:
 - `part1_engine/touch.py` draws two thumb sticks and turns fingers into the same inputs dict
   the keyboard makes. In a browser a finger tap doesn't create a mouse click, so `App.touch_as_mouse`
   makes one, which lets the menus work with taps.
-- The browser can't open LAN sockets, so the web/Android menu hides HOST/JOIN (you vs bots).
+- **Speed on phones:** the game logic always runs 60 times a second (`App.updates_this_frame`);
+  a slow phone just draws fewer frames. Text, panels, name tags and the zone tint are cached
+  instead of redrawn every frame, and the screen-edge vignette is skipped (`renderer.LITE`).
+- **Music on the web** is played by the browser's own `<audio>` player (`shared/web.py`, `dtMusic`),
+  as `.mp3` files next to the page. Decoding it in Python crackled whenever a frame was slow.
 - The **Android app** (`android_app/`) is the web version inside an Android WebView (Capacitor).
+- **Online play on phones** (`part1_engine/webnet.py`):
+  - *Join*: a browser can open a WebSocket, so the phone connects to `ws://<host>:8080/game`
+    and gets the same messages a laptop gets (welcome, state, inputs).
+    `phone.py` on a Mac/Windows host answers `/game` as a full player, `/` as a controller.
+  - *Host*: a WebView can't open ports, so a small native plugin
+    (`android_app/native/DriftNetPlugin.java`) opens port 5757 (laptops) and 8080 (phones) and
+    passes every message to Python; all game rules stay in Python (`WebHost`).
+  - *Online rooms (internet)*: the website can't reach `ws://` addresses on your Wi-Fi, so it uses
+    the relay server in `server/` (Cloudflare). HOST ONLINE connects to `wss://<relay>/host` and gets a
+    5-digit room code; JOIN connects to `wss://<relay>/join/<code>`. The relay just forwards the same
+    `join` / `msg` / `leave` events as the Android plugin, so `WebHost` doesn't care which one it uses.
+    The host's tab must stay open and visible: a hidden browser tab is paused, and so is the match.
 - **Windows / Android / web** are built on GitHub's computers by `.github/workflows/release.yml`
   when you push a tag like `v1.1`.
 
@@ -281,8 +297,8 @@ This is the path we followed, lesson by lesson. Each step builds on the last.
 ### Lesson 1 — Sockets (`practice: net1`)
 A **socket** is a phone line between two programs. TCP (`SOCK_STREAM`) guarantees bytes arrive in order.
 ```python
-server.bind(("0.0.0.0", 5555)); server.listen(); conn, address = server.accept()   # host waits
-client.connect((host_ip, 5555))                                                     # client calls
+server.bind(("0.0.0.0", 5757)); server.listen(); conn, address = server.accept()   # host waits
+client.connect((host_ip, 5757))                                                     # client calls
 conn.sendall("hi".encode());  data = conn.recv(1024).decode()                       # bytes both ways
 ```
 `0.0.0.0` = "accept calls from any network card". Sockets carry **bytes**, so text needs `.encode()` / `.decode()`.
@@ -324,7 +340,7 @@ and their own receiving thread, which stores `inputs[player_id]`. When they leav
 ```
    LAPTOP 2 (Client)                         LAPTOP 1 (Host)                            PHONE
    ─────────────────                         ───────────────                            ─────
-   connect ───────── TCP :5555 ───────────►  accept_players()  ◄── WebSocket :8080 ──  opens http://IP:8080
+   connect ───────── TCP :5757 ───────────►  accept_players()  ◄── WebSocket :8080 ──  opens http://IP:8080
    ◄── {"type":"welcome","player_id":3,                                                 ◄── {"t":"welcome","id":4}
         "map_id":"canyon","seed":5749,
         "rules":"br"}

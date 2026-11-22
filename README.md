@@ -17,7 +17,12 @@ collaborative project.
 - Drive over loot crates to get a weapon. Ammo runs out — find the next crate!
 
 **Versions:** Mac app · Windows app · Android app · Web (play in the browser, also on phones).
-Online play (host/join) is in the Mac and Windows apps; the web and Android versions are you vs bots.
+**Online play:**
+- **Room codes (internet, anywhere):** on the website and in the Android app, *HOST ONLINE* gives a
+  5-digit code; friends tap *JOIN GAME* and type it. Messages go through a tiny relay server
+  ([server/](server/)), the host's device runs the match.
+- **Same Wi-Fi:** the Mac, Windows and Android apps can host on the local network; laptops join with
+  the host's IP, phones can also open `http://<host IP>:8080` as a controller.
 
 ```bash
 .venv/bin/python main.py                    # menu

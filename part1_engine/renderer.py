@@ -10,6 +10,7 @@
 #      (crisp pixel art, like the reference)
 # =====================================================================
 import math
+import sys
 
 import pygame
 from pygame.math import Vector2
@@ -23,6 +24,7 @@ from part4_ui import art
 from part4_ui.assets import get_font
 
 _views = {}
+LITE = sys.platform == "emscripten"     # web / phone version: skip the most expensive effects
 WRECK = (64, 62, 70)
 
 # COLOR GRADING per map (like a film colourist): MULTIPLY tints the whole picture,
@@ -151,12 +153,9 @@ def _draw_zone(surf, game, cam):
     cx, cy = cam.to_view(zone["x"], zone["y"])
     r = int(zone["r"])
     vw, vh = surf.get_size()
-    overlay = pygame.Surface((vw, vh), pygame.SRCALPHA)
-    overlay.fill((150, 30, 90, 80))
     ring = pygame.Rect(cx - r, cy - r * YS, r * 2, r * 2 * YS)
-    if r > 0:
-        pygame.draw.ellipse(overlay, (0, 0, 0, 0), ring)
-    surf.blit(overlay, (0, 0))
+    if not ring.contains(surf.get_rect()):      # some of the screen is outside the safe zone
+        surf.blit(_zone_overlay((vw, vh), ring), (0, 0))
     if r > 0:
         pulse = (game.now // 250) % 2
         pygame.draw.ellipse(surf, (255, 110, 190) if pulse else (240, 70, 160), ring, 2)
@@ -168,6 +167,41 @@ def _draw_zone(surf, game, cam):
             a1, a2 = i / steps * math.tau, (i + 1) / steps * math.tau
             pygame.draw.line(surf, (255, 255, 255), (nx + math.cos(a1) * nr, ny + math.sin(a1) * nr * YS),
                              (nx + math.cos(a2) * nr, ny + math.sin(a2) * nr * YS), 1)
+
+
+_zone_cache = {"key": None, "img": None}
+
+
+def _zone_overlay(size, ring):
+    """Pink tint outside the safe zone. Only rebuilt when the zone or the camera moves."""
+    key = (size, tuple(ring))
+    if _zone_cache["key"] != key:
+        overlay = pygame.Surface(size, pygame.SRCALPHA)
+        overlay.fill((150, 30, 90, 80))
+        if ring.w > 0:
+            pygame.draw.ellipse(overlay, (0, 0, 0, 0), ring)
+        _zone_cache["key"], _zone_cache["img"] = key, overlay
+    return _zone_cache["img"]
+
+
+_tag_cache = {}
+
+
+def _name_tag(font, label, color):
+    """A tank's name with a dark outline, drawn once and reused."""
+    key = (label, tuple(color))
+    tag = _tag_cache.get(key)
+    if tag is None:
+        if len(_tag_cache) > 64:
+            _tag_cache.clear()
+        img = font.render(label, False, color)
+        shadow = font.render(label, False, OUTLINE)
+        tag = pygame.Surface((img.get_width() + 2, img.get_height() + 2), pygame.SRCALPHA)
+        for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            tag.blit(shadow, (1 + dx, 1 + dy))
+        tag.blit(img, (1, 1))
+        _tag_cache[key] = tag
+    return tag
 
 
 def _crown(surf, x, y):
@@ -256,12 +290,8 @@ def draw_world(game, screen):
             for i in range(pips):
                 view.fill(stats["color"] if i < filled else (70, 60, 70), (x - pips * 3 // 2 + i * 3, y + 5, 2, 2))
         label = game.label(tank.player_id)
-        tag = font.render(label, False, tank.color)
-        tx = x - tag.get_width() // 2
-        shadow = font.render(label, False, OUTLINE)
-        for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
-            view.blit(shadow, (tx + dx, y - 10 + dy))
-        view.blit(tag, (tx, y - 10))
+        tag = _name_tag(font, label, tank.color)
+        view.blit(tag, (x - tag.get_width() // 2, y - 11))
         if tank.player_id == leader:
             _crown(view, x, y - 16)
 
@@ -270,7 +300,8 @@ def draw_world(game, screen):
     view.fill(mult, special_flags=pygame.BLEND_RGB_MULT)
     view.fill(add, special_flags=pygame.BLEND_RGB_ADD)
     pygame.transform.scale(view, (W, H), screen)
-    screen.blit(_get_vignette(), (0, 0))
+    if not LITE:                       # the soft dark edge costs a full-screen blend: skip it on phones
+        screen.blit(_get_vignette(), (0, 0))
 
     # mouse reticle (full resolution)
     if game.mouse_active and game.phase != "over":

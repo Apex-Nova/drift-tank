@@ -33,6 +33,8 @@ from part1_engine.tank import Tank
 from part1_engine.bot import Bot
 from part1_engine.network import Host, Client, get_lan_ip
 from part1_engine.touch import TouchControls
+from part1_engine.webnet import WebHost
+from shared import web
 from part1_engine import renderer
 from part2_combat.weapons import WEAPONS, WEAPON_ORDER, splash_targets
 from part2_combat.fx import FX
@@ -69,7 +71,7 @@ class ProjectileView:
 
 class Game:
     def __init__(self, mode="local", host_ip=None, map_id=None, bots=0, name="", prefs=None,
-                 rules="br", humans=1, seed=None):
+                 rules="br", humans=1, seed=None, network=None, online=False):
         self.mode = mode
         self.rules = rules
         self.running = True
@@ -104,7 +106,8 @@ class Game:
         self.time_left = MATCH_TIME
 
         if mode == "join":
-            self.network = Client(host_ip, name)
+            # the phone/web version connects first (WebClient) and hands us the connection
+            self.network = network if network is not None else Client(host_ip, name)
             self.my_id = self.network.player_id
             map_id = self.network.map_id
             seed = self.network.seed
@@ -131,7 +134,12 @@ class Game:
             bot_ids = list(range(2, min(4, 1 + bots) + 1))
             for player_id in bot_ids:
                 self.add_bot(player_id)
-            self.network = Host(self.map.id, self.rules, reserved=set(bot_ids), seed=self.map.seed)
+            if web.IS_WEB:      # Android app: the native plugin opens the ports
+                # online=True: internet room (relay). The website can only do that (no ports).
+                self.network = WebHost(self.map.id, self.rules, reserved=set(bot_ids), seed=self.map.seed,
+                                       online=online or not web.can_host())
+            else:
+                self.network = Host(self.map.id, self.rules, reserved=set(bot_ids), seed=self.map.seed)
         elif mode == "demo":
             self.rules = "tdm"
             for player_id in range(1, 5):
@@ -700,6 +708,8 @@ class Game:
     def step(self):
         self.frame += 1
         self.events = []
+        if self.network is not None and hasattr(self.network, "poll"):
+            self.network.poll()                 # web version: pick up network messages
         if self.mode == "join":
             self.collect_inputs()
             if not self.network.connected:
@@ -804,7 +814,10 @@ class Game:
     def join_info(self):
         if self.mode != "host" or self.network is None:
             return None
-        return get_lan_ip(), self.network.phone_url()
+        if getattr(self.network, "error", None):
+            return self.network.error, None
+        ip = self.network.ip if hasattr(self.network, "ip") else get_lan_ip()
+        return ip or "starting...", self.network.phone_url()
 
     def time_left_value(self):
         if self.mode == "join":

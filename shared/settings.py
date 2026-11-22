@@ -85,5 +85,8 @@ class Settings:
     ZONE_STAGES = [(35, 15, 620, 4), (30, 15, 420, 6), (25, 15, 260, 9), (20, 12, 140, 13), (15, 12, 50, 18), (10, 10, 0, 25)]
 
     # --- online ---
-    GAME_PORT = 5555            # laptops join here
+    # Online rooms (web / Android): the relay server in server/ (Cloudflare). Deploy it with
+    #   cd server && npx wrangler deploy        then paste the address it prints here (wss://...)
+    RELAY_URL = "wss://drift-tank-relay.drift-tank-relay.workers.dev"
+    GAME_PORT = 5757            # laptops join here (not 5555: Android uses that for debugging)
     PHONE_PORT = 8080           # phones open http://<host ip>:8080
