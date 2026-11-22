@@ -14,7 +14,11 @@ import sys
 
 IS_WEB = sys.platform == "emscripten"
 
+# NOTE: pygbag (the web packager) rewrites the text ".mp" + "3" in our code to ".ogg" when it packs
+# the game, but our audio files next to index.html really are mp3. So the extension is glued
+# together at run time (AUDIO_EXT) where the packager can't see it.
 _JS = r"""
+window.AUDIO_EXT = "." + ["m", "p", "3"].join("");
 window.dtSfx = window.dtSfx || {
   // Sound effects played by the browser's Web Audio (no stutter when a frame is slow).
   ctx: null, buffers: {}, loading: {},
@@ -32,7 +36,7 @@ window.dtSfx = window.dtSfx || {
     const ctx = this.context();
     if (!ctx || this.loading[name]) return;
     this.loading[name] = true;
-    fetch("sfx/" + name + ".mp3").then(r => r.arrayBuffer())
+    fetch("sfx/" + name + AUDIO_EXT).then(r => r.arrayBuffer())
       .then(b => ctx.decodeAudioData(b)).then(buf => { this.buffers[name] = buf; })
       .catch(() => {});
   },
@@ -65,7 +69,7 @@ window.dtMusic = window.dtMusic || {
   },
   play(name, loop) {
     if (this.a) { this.a.onended = null; this.a.pause(); }
-    const a = new Audio("music/" + name + ".mp3");
+    const a = new Audio("music/" + name + AUDIO_EXT);
     a.loop = loop; a.volume = this.vol; this.a = a;
     a.onended = () => { if (this.a === a && this.loopList && this.list.length) this.next(); };
     a.play().catch(() => {             // browsers only allow sound after the first tap/key
