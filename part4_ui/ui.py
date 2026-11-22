@@ -23,26 +23,49 @@ MUTED = (150, 160, 190)
 PANEL = (20, 24, 44)           # navy
 
 
+_panel_cache = {}
+_text_cache = {}
+
+
 def panel(surf, rect, color=PANEL, alpha=215, border=(255, 255, 255, 34), radius=14):
+    """See-through rounded box. The box image is cached: building it every frame was slow on phones."""
     rect = pygame.Rect(rect)
-    s = pygame.Surface(rect.size, pygame.SRCALPHA)
-    pygame.draw.rect(s, color + (alpha,), s.get_rect(), border_radius=radius)
-    if border:
-        pygame.draw.rect(s, border, s.get_rect(), 1, border_radius=radius)
+    color = tuple(color)
+    key = (rect.size, color, alpha, tuple(border) if border else None, radius)
+    s = _panel_cache.get(key)
+    if s is None:
+        if len(_panel_cache) > 300:
+            _panel_cache.clear()
+        s = pygame.Surface(rect.size, pygame.SRCALPHA)
+        pygame.draw.rect(s, color + (alpha,), s.get_rect(), border_radius=radius)
+        if border:
+            pygame.draw.rect(s, border, s.get_rect(), 1, border_radius=radius)
+        _panel_cache[key] = s
     surf.blit(s, rect)
     return rect
 
 
 def text(surf, string, pos, size=20, color=TEXT, kind="future", anchor="topleft", shadow=True, alpha=255):
-    font = get_font(size, kind)
-    img = font.render(str(string), True, color)
+    """Draw text with a soft shadow. Rendered words are cached (font.render is slow)."""
+    color = tuple(color)
+    key = (str(string), size, color, kind, shadow, alpha)
+    cached = _text_cache.get(key)
+    if cached is None:
+        if len(_text_cache) > 600:
+            _text_cache.clear()
+        font = get_font(size, kind)
+        img = font.render(str(string), True, color)
+        sh = None
+        if shadow:
+            sh = font.render(str(string), True, (0, 0, 0))
+            sh.set_alpha(int(150 * alpha / 255))
+        if alpha < 255:
+            img.set_alpha(alpha)
+        cached = _text_cache[key] = (img, sh)
+    img, sh = cached
     rect = img.get_rect(**{anchor: pos})
-    if shadow:
-        sh = font.render(str(string), True, (0, 0, 0))
-        sh.set_alpha(int(150 * alpha / 255))
+    if sh is not None:
         surf.blit(sh, rect.move(2, 2))
-    if alpha < 255:
-        img.set_alpha(alpha)
     surf.blit(img, rect)
     return rect
 

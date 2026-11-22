@@ -31,11 +31,15 @@ class App:
         except pygame.error:
             pass
         assets.init_sound()
+        assets.preload_web_sounds()
         assets.set_volume(self.prefs.get("volume", 0.7))
         assets.set_music_volume(self.prefs.get("music", 0.5))
         if self.prefs.get("fullscreen"):
             self.set_fullscreen(True)
         self.clock = pygame.time.Clock()
+        self.frame_ms = 1000 / 60
+        self.lag_ms = 0.0
+        self.touch_screen = None          # web: is this a phone/tablet? (asked once)
         self.running = True
         self._backdrop = None
 
@@ -65,12 +69,12 @@ class App:
         if on != is_full:
             pygame.display.toggle_fullscreen()
 
-    def start_game(self, mode, map_id, bots=0, host_ip=None, name="", rules="br", humans=1, seed=None):
+    def start_game(self, mode, map_id, bots=0, host_ip=None, name="", rules="br", humans=1, seed=None, network=None, online=False):
         """Create a Game and show it. Returns an error message (str) or None."""
         from part1_engine.game import Game
         try:
             game = Game(mode=mode, host_ip=host_ip, map_id=map_id, bots=bots, rules=rules, humans=humans, seed=seed,
-                        name=name or self.prefs.get("name", ""), prefs=self.prefs)
+                        name=name or self.prefs.get("name", ""), prefs=self.prefs, network=network, online=online)
         except ConnectionError as error:
             return str(error)
         except OSError as error:
@@ -87,11 +91,13 @@ class App:
             assets.play_music("victory", loop=False) if self.screen.phase == "over" else assets.play_music("battle")
         else:
             assets.play_music("menu")
+        assets.update_music()           # start the next random track when one ends
 
     def step(self):
         """One frame: events -> update -> draw. Returns False when the app should close."""
         from part4_ui.screens import MainMenu
         from part1_engine.game import Game
+        screen_before = self.screen
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
@@ -99,11 +105,16 @@ class App:
                 self.prefs["fullscreen"] = not self.prefs.get("fullscreen", False)
                 self.set_fullscreen(self.prefs["fullscreen"])
                 save_prefs(self.prefs)
+            elif self.is_echo_of_touch(event):
+                continue
             else:
                 self.screen.handle_event(event)
                 for fake in self.touch_as_mouse(event):
                     self.screen.handle_event(fake)
-        self.screen.update_screen()
+        for _ in range(self.updates_this_frame()):
+            self.screen.update_screen()
+            if self.screen is not screen_before:
+                break
         self.update_music()
         if isinstance(self.screen, Game) and not self.screen.running:
             message = self.screen.result[1] if self.screen.result else None
@@ -115,8 +126,30 @@ class App:
             font = assets.get_font(12, "narrow")
             self.window.blit(font.render("%d FPS" % self.clock.get_fps(), True, (255, 255, 255)), (6, 700))
         pygame.display.flip()
-        self.clock.tick(Settings.FPS)
+        self.frame_ms = self.clock.tick(Settings.FPS)
         return self.running
+
+    def updates_this_frame(self):
+        """The game logic is made for 60 updates a second. On desktop we draw 60 frames a second,
+        so it's 1 update per frame. A phone may only manage 30 frames: then we update twice per
+        frame so tanks still move at the right speed (they just look a bit less smooth)."""
+        if sys.platform != "emscripten":
+            return 1
+        self.lag_ms = min(self.lag_ms + self.frame_ms, 1000 / 60 * 4)
+        updates = max(1, min(3, round(self.lag_ms / (1000 / 60))))
+        self.lag_ms = max(-1000 / 60, self.lag_ms - updates * 1000 / 60)
+        return updates
+
+    def is_echo_of_touch(self, event):
+        """Phones also send a pretend mouse click after every tap. We already turned the tap
+        into a click ourselves (touch_as_mouse), so drop the phone's copy - otherwise every
+        button would be pressed twice."""
+        if sys.platform != "emscripten" or event.type not in (pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP, pygame.MOUSEMOTION):
+            return False
+        if self.touch_screen is None:
+            from part1_engine.touch import TouchControls
+            self.touch_screen = TouchControls.has_touch_screen()
+        return self.touch_screen       # on a touch screen we only listen to fingers
 
     def touch_as_mouse(self, event):
         """In a browser a finger tap doesn't make a mouse click, so menus would ignore it.

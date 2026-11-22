@@ -129,10 +129,13 @@ class PhoneServer:
                 if ":" in line:
                     k, v = line.split(":", 1)
                     headers[k.strip().lower()] = v.strip()
+            path = lines[0].split(" ")[1] if lines[0].count(" ") >= 2 else "/"
             if headers.get("upgrade", "").lower() == "websocket":
-                self.websocket(conn, headers)
+                if path.startswith("/game"):
+                    self.game_client(conn, headers)      # a phone running the game app itself
+                else:
+                    self.websocket(conn, headers)        # a phone used as a controller
             else:
-                path = lines[0].split(" ")[1] if " " in lines[0] else "/"
                 if path in ("/", "/index.html"):
                     body, ctype, status = self.page, "text/html; charset=utf-8", "200 OK"
                 else:
@@ -146,13 +149,51 @@ class PhoneServer:
             except OSError:
                 pass
 
-    def websocket(self, conn, headers):
+    @staticmethod
+    def handshake(conn, headers):
         key = headers.get("sec-websocket-key", "")
         accept = base64.b64encode(hashlib.sha1((key + MAGIC).encode()).digest()).decode()
         conn.sendall(("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
                       "Sec-WebSocket-Accept: %s\r\n\r\n" % accept).encode())
         conn.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-        phone = PhoneConnection(conn)
+        return PhoneConnection(conn)
+
+    def game_client(self, conn, headers):
+        """The phone/web version of the game joining as a full player (it draws the game itself).
+        Same messages as a laptop (welcome, state, inputs), just inside WebSocket frames."""
+        client = self.handshake(conn, headers)
+        player_id = self.host.claim_id()
+        if player_id is None:
+            client.send({"type": "full"})
+            conn.close()
+            return
+        client.send({"type": "welcome", "player_id": player_id, "map_id": self.host.map_id,
+                     "seed": self.host.seed, "rules": self.host.rules})
+        with self.host.lock:
+            self.host.web_clients[player_id] = client
+            self.host.names[player_id] = "P%d" % player_id
+        try:
+            while True:
+                text = client.recv()
+                if text is None:
+                    break
+                try:
+                    message = json.loads(text)
+                except ValueError:
+                    continue
+                if message.get("name"):
+                    self.host.names[player_id] = str(message["name"])[:12]
+                self.host.inputs[player_id] = message
+        except (OSError, ConnectionError):
+            pass
+        self.host.release_id(player_id)
+        try:
+            conn.close()
+        except OSError:
+            pass
+
+    def websocket(self, conn, headers):
+        phone = self.handshake(conn, headers)
         player_id = self.host.claim_id()
         if player_id is None:
             phone.send({"t": "full"})

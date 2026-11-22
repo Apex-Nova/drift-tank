@@ -1,0 +1,12 @@
+# Cloudflare settings for the Drift Tank relay.  Deploy:  cd server && npx wrangler deploy
+name = "drift-tank-relay"
+main = "src/index.js"
+compatibility_date = "2025-09-01"
+
+[[durable_objects.bindings]]
+name = "ROOMS"
+class_name = "Room"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Room"]

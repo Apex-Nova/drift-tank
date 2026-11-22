@@ -6,6 +6,8 @@
 #  Client  : another laptop: sends its inputs, draws the host's state.
 #  Phones  : open http://<host ip>:8080 in the browser -> joystick
 #            controller page (see phone.py). They play on the host's screen.
+#  Phone app / web version: connects to ws://<host ip>:8080/game and is a
+#            full player like a laptop (same messages inside WebSocket frames).
 #
 #  Messages are JSON dicts, one per line ("\n" at the end) — Lesson 3.
 #    host -> client : {"type": "welcome", "player_id": 2, "map_id": "dust_bowl"}
@@ -47,7 +49,8 @@ class Host:
         self.reserved = set(reserved or ())     # player numbers already used by bots
         self.inputs = {}        # player_id -> latest inputs from that laptop/phone
         self.conns = {}         # player_id -> laptop socket
-        self.phones = {}        # player_id -> PhoneConnection
+        self.phones = {}        # player_id -> PhoneConnection (phone used as a controller)
+        self.web_clients = {}   # player_id -> PhoneConnection (phone/web version of the game)
         self.names = {}         # player_id -> name shown in the HUD
         self.lock = threading.Lock()
         self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -66,13 +69,14 @@ class Host:
     # ---------- player slots (shared by laptops and phones) ----------
     def connected_ids(self):
         with self.lock:
-            return set(self.conns) | set(self.phones)
+            return set(self.conns) | set(self.phones) | set(self.web_clients)
 
     def claim_id(self):
         """The host is player 1. Newcomers get the lowest free number 2-4."""
         with self.lock:
             for candidate in range(2, MAX_PLAYERS + 1):
-                if candidate not in self.conns and candidate not in self.phones and candidate not in self.reserved:
+                if candidate not in self.reserved and candidate not in self.conns \
+                        and candidate not in self.phones and candidate not in self.web_clients:
                     return candidate
         return None
 
@@ -81,6 +85,7 @@ class Host:
             self.inputs.pop(player_id, None)
             self.conns.pop(player_id, None)
             self.phones.pop(player_id, None)
+            self.web_clients.pop(player_id, None)
             self.names.pop(player_id, None)
 
     # ---------- laptops ----------
@@ -141,6 +146,8 @@ class Host:
                 conn.sendall(data)
             except OSError:
                 self.release_id(player_id)
+        for player_id, client in list(self.web_clients.items()):
+            client.send(state)
 
     def send_phone_status(self, statuses):
         for player_id, phone in list(self.phones.items()):

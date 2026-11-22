@@ -1,0 +1,12 @@
+{
+  "name": "drift-tank-relay",
+  "private": true,
+  "description": "Internet relay for Drift Tank online rooms (Cloudflare Worker + Durable Object)",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}

@@ -102,25 +102,58 @@ class TouchControls:
         return inputs
 
     # ---------- drawing ----------
+    # Each stick is drawn on its own small see-through image (not a full-screen one):
+    # blending a whole 1280x720 layer every frame was a big part of the lag on phones.
     def draw(self, surf):
         if not self.active:
             return
-        overlay = pygame.Surface(surf.get_size(), pygame.SRCALPHA)
         w, h = surf.get_size()
-        self._draw_stick(overlay, self.move, (190, h - 170), (246, 240, 230))
-        self._draw_stick(overlay, self.aim, (w - 190, h - 170), (255, 120, 100))
-        # pause button
-        pygame.draw.rect(overlay, (20, 24, 44, 170), PAUSE_RECT, border_radius=10)
-        for dx in (-8, 4):
-            pygame.draw.rect(overlay, (246, 240, 230, 230), (PAUSE_RECT.centerx + dx, PAUSE_RECT.y + 12, 5, 20))
-        surf.blit(overlay, (0, 0))
+        self._draw_stick(surf, self.move, (190, h - 170), (246, 240, 230))
+        self._draw_stick(surf, self.aim, (w - 190, h - 170), (255, 120, 100))
+        surf.blit(_pause_image(), PAUSE_RECT)
 
-    def _draw_stick(self, overlay, stick, home, color):
+    def _draw_stick(self, surf, stick, home, color):
         center = stick.center if stick.finger is not None else Vector2(home)
-        knob = center + stick.push() * RADIUS
-        alpha = 150 if stick.finger is not None else 70
-        pygame.draw.circle(overlay, (20, 24, 44, alpha), center, RADIUS + 8)
-        pygame.draw.circle(overlay, color + (alpha,), center, RADIUS + 8, 3)
-        if stick is self.aim:   # inner ring = the fire line
-            pygame.draw.circle(overlay, color + (alpha // 2,), center, int(RADIUS * FIRE_AT), 2)
-        pygame.draw.circle(overlay, color + (min(255, alpha + 80),), knob, 34)
+        held = stick.finger is not None
+        base = _base_image(color, held, stick is self.aim)
+        surf.blit(base, base.get_rect(center=(round(center.x), round(center.y))))
+        knob = _knob_image(color, held)
+        pos = center + stick.push() * RADIUS
+        surf.blit(knob, knob.get_rect(center=(round(pos.x), round(pos.y))))
+
+
+_images = {}
+
+
+def _base_image(color, held, with_fire_ring):
+    key = ("base", color, held, with_fire_ring)
+    if key not in _images:
+        size = (RADIUS + 10) * 2
+        img = pygame.Surface((size, size), pygame.SRCALPHA)
+        c = (size // 2, size // 2)
+        alpha = 150 if held else 70
+        pygame.draw.circle(img, (20, 24, 44, alpha), c, RADIUS + 8)
+        pygame.draw.circle(img, color + (alpha,), c, RADIUS + 8, 3)
+        if with_fire_ring:                       # inner ring = the fire line
+            pygame.draw.circle(img, color + (alpha // 2,), c, int(RADIUS * FIRE_AT), 2)
+        _images[key] = img
+    return _images[key]
+
+
+def _knob_image(color, held):
+    key = ("knob", color, held)
+    if key not in _images:
+        img = pygame.Surface((70, 70), pygame.SRCALPHA)
+        pygame.draw.circle(img, color + (min(255, (150 if held else 70) + 80),), (35, 35), 34)
+        _images[key] = img
+    return _images[key]
+
+
+def _pause_image():
+    if "pause" not in _images:
+        img = pygame.Surface(PAUSE_RECT.size, pygame.SRCALPHA)
+        pygame.draw.rect(img, (20, 24, 44, 170), img.get_rect(), border_radius=10)
+        for dx in (-8, 4):
+            pygame.draw.rect(img, (246, 240, 230, 230), (PAUSE_RECT.w // 2 + dx, 12, 5, 20))
+        _images["pause"] = img
+    return _images["pause"]
