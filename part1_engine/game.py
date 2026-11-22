@@ -795,6 +795,16 @@ class Game:
         if self.zone and not self.silent and self.frame % 40 == 0 and self.phase == "playing":
             if any(t.alive and t.player_id in self.local_ids() and self.outside_zone(t.pos) for t in self.tanks):
                 play_sound("zone_hurt")
+        if web.IS_WEB and self.frame % 60 == 1:
+            cg_name = web.cg_name()                 # CrazyGames username may arrive a bit after start
+            if cg_name and self.mode == "host" and self.names.get(1) in ("HOST", "", None):
+                self.names[1] = cg_name
+                if self.find_tank(1) is not None:
+                    self.find_tank(1).name = cg_name
+            code = self.online_room_code()          # CrazyGames: share our room so friends can Join / Invite
+            if code:
+                joinable = len([t for t in self.tanks if not t.is_bot]) < 4
+                web.cg_call("dtCG.room(%s, %s)" % (web.js_str(code), "true" if joinable else "false"))
         self.cosmetic_update()
         self.fx.update(self.now)
         self.update_camera()
@@ -804,7 +814,17 @@ class Game:
         self.result = ("menu", message)
         self.close()
 
+    def online_room_code(self):
+        """5-digit code of the online room we're in (host or joiner), else None."""
+        net = self.network
+        code = getattr(net, "ip", None) if self.mode == "host" else getattr(net, "code", None)
+        if getattr(net, "online", False) and code and web.is_room_code(str(code)):
+            return str(code)
+        return None
+
     def close(self):
+        if web.IS_WEB:
+            web.cg_call("dtCG.leftRoom()")          # CrazyGames: we left the room
         if self.network is not None:
             self.network.close()
             self.network = None

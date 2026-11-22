@@ -438,7 +438,7 @@ class JoinScreen:
                 save_prefs(self.app.prefs)
                 if web.IS_WEB:
                     from part1_engine.webnet import WebClient
-                    self.client = WebClient(self.ip.value, self.name.value)
+                    self.client = WebClient(self.ip.value, self.name.value or web.cg_name())
                     self.client_started = pygame.time.get_ticks()
                     return
                 error = self.app.start_game("join", None, host_ip=self.ip.value, name=self.name.value)

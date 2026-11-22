@@ -2,6 +2,8 @@
 # Builds the WEB version of Drift Tank with pygbag (Python + Pygame compiled to WebAssembly).
 #   ./build_web.sh          -> build into build/web/drift-tank/build/web/  (upload that folder anywhere)
 #   ./build_web.sh serve    -> build, then test it at http://localhost:8000
+#   ./build_web.sh crazygames -> build, then make dist/crazygames/ (upload folder for CrazyGames:
+#                              their SDK added, no archive files inside)
 # Needs:  pip install pygbag certifi      and  ffmpeg (turns the .wav effects into small .mp3 for browsers)
 # Web version = single player vs bots (browsers can't open the LAN sockets online play uses).
 set -e
@@ -37,4 +39,19 @@ else
   python -m pygbag --build --ume_block 0 --title "Drift Tank" "$OUT"
   cp -R build/web/music build/web/sfx "$OUT/build/web/"
   echo "Done -> $OUT/build/web/"
+  if [ "$1" = "crazygames" ]; then
+    # CrazyGames upload: their uploader refuses archive files (.tar.gz / .apk), so the game data
+    # gets another name; and their SDK is loaded first (it locks the game to CrazyGames' sites,
+    # which is why it is ONLY in this folder, not on GitHub Pages or in the Android app).
+    CG=dist/crazygames
+    rm -rf "$CG" && mkdir -p dist && cp -R "$OUT/build/web" "$CG"
+    mv "$CG/drift-tank.tar.gz" "$CG/drift-tank.tgzdata"
+    rm -f "$CG/drift-tank.apk"
+    sed -i.bak 's/drift-tank\.tar\.gz/drift-tank.tgzdata/g' "$CG/index.html"
+    sed -i.bak 's|<head>|<head>\
+    <script src="https://sdk.crazygames.com/crazygames-sdk-v3.js"></script>|' "$CG/index.html"
+    rm -f "$CG/index.html.bak"
+    grep -q crazygames-sdk-v3 "$CG/index.html" && grep -q tgzdata "$CG/index.html"
+    echo "CrazyGames upload folder -> $CG/  (drag everything inside it into the uploader)"
+  fi
 fi

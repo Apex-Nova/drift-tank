@@ -84,6 +84,11 @@ How the web/phone versions work:
 - **Waiting room**: a hosted game starts in phase `"lobby"`. Nothing moves; `Game.lobby_list()` sends
   who is there and who pressed READY (joiners send `"ready": true` with their inputs). The host's
   START calls `Game.begin_match()`, which only works once everyone is ready.
+- **CrazyGames** (`./build_web.sh crazygames` -> `dist/crazygames/`): the upload folder loads the
+  CrazyGames SDK (only there - it locks a game to CrazyGames' sites). `shared/web.py` `dtCG` reports
+  loading and gameplay start/stop, shares the online room (Invite button + `updateRoom`), joins a
+  friend's room from an invite link, hosts right away for "instant multiplayer", obeys
+  `muteAudio`, and uses the CrazyGames username. Outside CrazyGames all of it does nothing.
 - **Phone screen fit**: `main.py` makes the game as wide as the phone's screen shape
   (e.g. 1600x720 on a 20:9 phone) before anything else loads, so there are no black bars.
 - **Windows / Android / web** are built on GitHub's computers by `.github/workflows/release.yml`

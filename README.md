@@ -31,6 +31,7 @@ collaborative project.
 .venv/bin/python main.py join 192.168.1.5   # join a host on the same Wi-Fi
 ./build_app.sh                              # build "Drift Tank.app"
 ./build_web.sh serve                        # web version -> http://localhost:8000
+./build_web.sh crazygames                   # CrazyGames upload folder -> dist/crazygames/
 ```
 Windows, Android and web builds are made by GitHub Actions: push a tag like `v1.1`
 (see [.github/workflows/release.yml](.github/workflows/release.yml)).
