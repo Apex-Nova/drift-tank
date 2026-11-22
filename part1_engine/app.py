@@ -19,6 +19,10 @@ from part4_ui import assets
 class App:
     def __init__(self, mode=None, host_ip=None):
         pygame.init()
+        if sys.platform == "emscripten" and pygame.mixer.get_init():
+            # The browser plays all sound on the web/phone version (shared/web.py). pygame's own
+            # audio engine would keep running on the game's thread and steal time every frame.
+            pygame.mixer.quit()
         self.prefs = load_prefs()
         pygame.display.set_caption(Settings.TITLE)
         # On desktop pygame scales the 1280x720 picture to the window (SCALED).
@@ -136,7 +140,7 @@ class App:
         if sys.platform != "emscripten":
             return 1
         self.lag_ms = min(self.lag_ms + self.frame_ms, 1000 / 60 * 4)
-        updates = max(1, min(3, round(self.lag_ms / (1000 / 60))))
+        updates = max(1, min(2, round(self.lag_ms / (1000 / 60))))   # at most 2: more would slow it further
         self.lag_ms = max(-1000 / 60, self.lag_ms - updates * 1000 / 60)
         return updates
 
