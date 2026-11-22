@@ -98,6 +98,8 @@ class Game:
         self.frame = 0
         self.track_marks = {}
         self.silent = mode == "demo"
+        self.ready = False                 # joiner: pressed READY in the waiting room
+        self.lobby = []                    # joiner: waiting-room list sent by the host
         self.zone = None
         self.zone_plan = []
         self.match_start = self.now
@@ -107,7 +109,13 @@ class Game:
 
         if mode == "join":
             # the phone/web version connects first (WebClient) and hands us the connection
-            self.network = network if network is not None else Client(host_ip, name)
+            if network is not None:
+                self.network = network
+            elif web.is_room_code(host_ip or ""):      # 5-digit code = online room
+                from part1_engine.relaynet import RelayClient
+                self.network = RelayClient(host_ip, name)
+            else:
+                self.network = Client(host_ip, name)
             self.my_id = self.network.player_id
             map_id = self.network.map_id
             seed = self.network.seed
@@ -138,6 +146,9 @@ class Game:
                 # online=True: internet room (relay). The website can only do that (no ports).
                 self.network = WebHost(self.map.id, self.rules, reserved=set(bot_ids), seed=self.map.seed,
                                        online=online or not web.can_host())
+            elif online:          # Mac / Windows: internet room through the relay
+                from part1_engine.relaynet import RelayHost
+                self.network = RelayHost(self.map.id, self.rules, reserved=set(bot_ids), seed=self.map.seed)
             else:
                 self.network = Host(self.map.id, self.rules, reserved=set(bot_ids), seed=self.map.seed)
         elif mode == "demo":
@@ -148,6 +159,8 @@ class Game:
         self.player1 = self.tanks[0] if self.tanks else None
         if mode != "join":
             self.start_match(keep_phase=(mode == "demo"), new_map=False)
+        if mode == "host":
+            self.phase = "lobby"           # wait in the waiting room until the host presses START
         self.update_camera(instant=True)
 
     # ------------------------------------------------------------------
@@ -310,6 +323,7 @@ class Game:
         elif self.mode == "join":
             mine = self.find_tank(self.my_id)
             inputs = {} if self.paused else self.local_inputs(keys, mine)
+            inputs["ready"] = self.ready
             self.network.send_inputs(inputs)
         if not (self.paused and self.mode == "local"):
             for player_id, bot in self.bots.items():
@@ -326,6 +340,8 @@ class Game:
 
     def update(self, all_inputs):
         now = self.now
+        if self.phase == "lobby":
+            return                         # nobody moves until the host starts the match
         if self.phase == "countdown":
             if now - self.phase_started >= COUNTDOWN_MS:
                 self.phase = "playing"
@@ -527,7 +543,8 @@ class Game:
                 "cr": self.loot.to_state(), "dead": [o.index for o in self.map.objects if not o.alive],
                 "dmg": [o.index for o in self.map.objects if o.alive and o.destructible and o.health < o.max_health * 0.5],
                 "k": self.scoreboard.kills, "d": self.deaths, "ev": self.events, "win": self.winner,
-                "wt": self.win_team, "zone": zone}
+                "wt": self.win_team, "zone": zone,
+                "lobby": self.lobby_list() if self.phase == "lobby" else None}
 
     def apply_state(self, state):
         if state["map"] != self.map.id or state.get("seed") != self.map.seed:
@@ -540,6 +557,7 @@ class Game:
         self.winner = state.get("win")
         self.win_team = state.get("wt")
         self.zone = state.get("zone")
+        self.lobby = state.get("lobby") or []
         seen = []
         for d in state["tanks"]:
             seen.append(d["id"])
@@ -680,6 +698,38 @@ class Game:
                                    "color": list(tank.color)}
         return statuses
 
+    # ------------------------------------------------------------------
+    #  waiting room (lobby): host waits for players, then presses START
+    # ------------------------------------------------------------------
+    def lobby_list(self):
+        """[[id, name, ready, kind], ...] for the waiting-room panel. kind: host / bot / player."""
+        rows = []
+        for tank in sorted(self.tanks, key=lambda t: t.player_id):
+            pid = tank.player_id
+            if pid == 1:
+                rows.append([pid, self.names.get(pid, "HOST"), True, "host"])
+            elif tank.is_bot:
+                rows.append([pid, self.names.get(pid, "BOT"), True, "bot"])
+            else:
+                is_controller = self.network is not None and pid in getattr(self.network, "phones", {})
+                ready = is_controller or bool(self.network and self.network.inputs.get(pid, {}).get("ready"))
+                rows.append([pid, self.names.get(pid, "P%d" % pid), ready, "player"])
+        return rows
+
+    def everyone_ready(self):
+        return all(row[2] for row in (self.lobby_list() if self.mode == "host" else self.lobby))
+
+    def begin_match(self):
+        """Host pressed START in the waiting room."""
+        if self.mode == "host" and self.phase == "lobby" and self.everyone_ready():
+            play_sound("confirm")
+            self.start_match(new_map=False)
+
+    def toggle_ready(self):
+        if self.mode == "join" and self.phase == "lobby":
+            self.ready = not self.ready
+            play_sound("confirm" if self.ready else "click")
+
     def sync_players(self):
         """Host: a tank appears when a laptop/phone joins and disappears when it leaves."""
         connected = self.network.connected_ids()
@@ -706,6 +756,10 @@ class Game:
     #  one frame
     # ------------------------------------------------------------------
     def step(self):
+        # After leave() the connection is closed (network = None) but the App may still call
+        # step() once more in the same frame (several updates per frame on phones) -> stop here.
+        if not self.running or (self.mode in ("host", "join") and self.network is None):
+            return
         self.frame += 1
         self.events = []
         if self.network is not None and hasattr(self.network, "poll"):
@@ -787,11 +841,13 @@ class Game:
             if event.key in BARREL_KEYS:
                 self.mouse_active = False          # keys take the barrel back from the mouse
             if event.key == pygame.K_ESCAPE:
-                if self.phase == "over":
+                if self.phase in ("over", "lobby"):
                     self.leave()
                 else:
                     self.paused = not self.paused
                     play_sound("click")
+            elif event.key in (pygame.K_RETURN, pygame.K_KP_ENTER, pygame.K_SPACE) and self.phase == "lobby":
+                self.begin_match() if self.mode == "host" else self.toggle_ready()
             elif event.key in (pygame.K_RETURN, pygame.K_KP_ENTER) and self.phase == "over" and self.mode in ("local", "host"):
                 self.start_match()
             elif event.key == pygame.K_TAB and not any(t.alive for t in self.tanks if t.player_id in self.local_ids()):
@@ -808,7 +864,7 @@ class Game:
     def draw(self, surface):
         renderer.draw_world(self, surface)
         game_hud.draw(self, surface)
-        if self.phase != "over" and not self.paused:
+        if self.phase not in ("over", "lobby") and not self.paused:
             self.touch.draw(surface)
 
     def join_info(self):

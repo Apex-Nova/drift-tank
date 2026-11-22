@@ -213,10 +213,22 @@ def _crown(surf, x, y):
     surf.fill((255, 250, 200), (x - 1, y - 2, 2, 2))
 
 
+def _grade_map_once(game_map):
+    """Phones / web: tinting the whole screen every frame cost ~7 ms there (slow pixel maths in
+    the browser). Instead the map's ground is tinted ONCE when it loads - nearly the same look."""
+    mult, add = GRADES.get(game_map.theme_name, ((255, 255, 255), (0, 0, 0)))
+    for surf in (game_map.ground, game_map.bottom_cliff):
+        surf.fill(mult, special_flags=pygame.BLEND_RGB_MULT)
+        surf.fill(add, special_flags=pygame.BLEND_RGB_ADD)
+    game_map.graded = True
+
+
 def draw_world(game, screen):
     cam = game.camera
     cam.shake = game.fx.offset()
     now = game.now
+    if LITE and not getattr(game.map, "graded", False):
+        _grade_map_once(game.map)
     view = _view_surface(cam.view_size)
     view.fill(game.map.theme["bg"])
     view.blit(game.map.ground, (-cam.left, -cam.top))
@@ -297,8 +309,9 @@ def draw_world(game, screen):
 
     game.fx.draw_texts(view, cam)
     mult, add = GRADES.get(game.map.theme_name, ((255, 255, 255), (0, 0, 0)))
-    view.fill(mult, special_flags=pygame.BLEND_RGB_MULT)
-    view.fill(add, special_flags=pygame.BLEND_RGB_ADD)
+    if not LITE:
+        view.fill(mult, special_flags=pygame.BLEND_RGB_MULT)
+        view.fill(add, special_flags=pygame.BLEND_RGB_ADD)
     pygame.transform.scale(view, (W, H), screen)
     if not LITE:                       # the soft dark edge costs a full-screen blend: skip it on phones
         screen.blit(_get_vignette(), (0, 0))

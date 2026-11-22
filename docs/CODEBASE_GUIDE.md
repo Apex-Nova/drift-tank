@@ -78,6 +78,14 @@ How the web/phone versions work:
     5-digit room code; JOIN connects to `wss://<relay>/join/<code>`. The relay just forwards the same
     `join` / `msg` / `leave` events as the Android plugin, so `WebHost` doesn't care which one it uses.
     The host's tab must stay open and visible: a hidden browser tab is paused, and so is the match.
+  - *Mac / Windows online rooms*: `part1_engine/relaynet.py` (`RelayHost`, `RelayClient`) talks to the
+    same relay over `wss://` with a small hand-written WebSocket client, so desktop, phone and web
+    players can share one room.
+- **Waiting room**: a hosted game starts in phase `"lobby"`. Nothing moves; `Game.lobby_list()` sends
+  who is there and who pressed READY (joiners send `"ready": true` with their inputs). The host's
+  START calls `Game.begin_match()`, which only works once everyone is ready.
+- **Phone screen fit**: `main.py` makes the game as wide as the phone's screen shape
+  (e.g. 1600x720 on a 20:9 phone) before anything else loads, so there are no black bars.
 - **Windows / Android / web** are built on GitHub's computers by `.github/workflows/release.yml`
   when you push a tag like `v1.1`.
 
