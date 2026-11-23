@@ -123,6 +123,6 @@ jobs:
             Drift-Tank-Web.zip
           body: |
             **Windows:** unzip, open the folder, double-click `Drift Tank.exe` (click "More info -> Run anyway" if Windows warns).
-            **Android:** download the .apk on your phone and open it (allow "install unknown apps"). Needs internet the first time.
+            **Android:** download the .apk on your phone and open it (allow "install unknown apps"). Works offline (Wi-Fi games need no internet).
             **Mac:** attach `DriftTank-mac.zip` yourself (built with ./build_app.sh on a Mac).
             **Web:** play in the browser on the GitHub Pages link of this repo.
