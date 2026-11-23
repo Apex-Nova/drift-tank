@@ -102,6 +102,7 @@ window.dtCG = window.dtCG || {
       if (this.env !== "local" && this.env !== "crazygames") return;   // "disabled": never call the SDK
       this.ready = true;
       this.call(S => S.game.loadingStart());
+      if (this.wantLoaded) this.loaded();
       this.instant = !!S.game.isInstantMultiplayer;
       try { this.device = (S.user.systemInfo.device.type || "").toLowerCase(); } catch (e) { this.device = ""; }
       this.invite = S.game.getInviteParam("room");
@@ -115,7 +116,12 @@ window.dtCG = window.dtCG || {
       }
     }).catch((e) => console.warn("CrazyGames SDK init:", e));
   },
-  loaded() { if (!this.loadDone) { this.loadDone = true; this.call(S => S.game.loadingStop()); } },
+  // The game can be on screen before the SDK has finished starting. Then remember it and send
+  // loadingStop once the SDK is ready (before, it was dropped and CrazyGames saw a 2-minute load).
+  loaded() {
+    this.wantLoaded = true;
+    if (!this.loadDone && this.ready) { this.loadDone = true; this.call(S => S.game.loadingStop()); }
+  },
   gameplay(on) {                     // gameplayStart / gameplayStop, only when it changes
     if (this.playing === on) return;
     this.playing = on;
