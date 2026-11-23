@@ -45,7 +45,7 @@
 
 
 MATCH_TIME = 240            # seconds per Team Deathmatch (scoreboard.time_left uses this)
-TANK_MAX_HEALTH = 100
+TANK_MAX_HEALTH = 160
 class Settings:
     TITLE = "Drift Tank"
     SCREEN_WIDTH = 1280         # logical size; the window scales to any size
@@ -59,7 +59,7 @@ class Settings:
     PLAYER_COLORS = [(255, 0, 0), (0, 0, 255), (0, 255, 0), (255, 255, 0)]
     TANK_SPEED = 1.8
     TANK_SIZE = (40, 40)
-    TANK_MAX_HEALTH = 100
+    TANK_MAX_HEALTH = 160          # was 100: fights lasted ~1.5 s, Battleground matches ~30 s (tools/soak_test.py)
     TANK_SHOOT_COOLDOWN = 500
     BULLET_SPEED = 10
     BULLET_SIZE = (10, 10)
@@ -76,7 +76,7 @@ class Settings:
     SPAWN_SHIELD_MS = 2000      # can't be hurt right after spawning
     CRATE_SPAWN_MS = 3500       # a new loot crate drops this often...
     MAX_CRATES = 9              # ...up to this many on the map
-    HEALTH_CRATE_HEAL = 40
+    HEALTH_CRATE_HEAL = 60
     TANK_GRIP = 0.14            # 0-1: lower = more drift
     ICE_GRIP = 0.035
 
@@ -90,3 +90,4 @@ class Settings:
     RELAY_URL = "wss://drift-tank-relay.drift-tank-relay.workers.dev"
     GAME_PORT = 5757            # laptops join here (not 5555: Android uses that for debugging)
     PHONE_PORT = 8080           # phones open http://<host ip>:8080
+    LAN_FIND_PORT = 5758        # hosts announce themselves on the Wi-Fi here (part1_engine/lan.py)

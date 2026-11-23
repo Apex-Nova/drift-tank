@@ -12,8 +12,13 @@ fi
 if ! grep -q 'usesCleartextTraffic' "$M"; then
   perl -0pi -e 's/<application(?=\s)/<application android:usesCleartextTraffic="true"/' "$M"
 fi
+# Wi-Fi game finder: receive the hosts' broadcast announcements
+if ! grep -q 'CHANGE_WIFI_MULTICAST_STATE' "$M"; then
+  perl -0pi -e 's|(<uses-permission android:name="android.permission.INTERNET" />)|$1\n    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />\n    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />|' "$M"
+fi
 grep -q 'screenOrientation="sensorLandscape"' "$M"
 grep -q 'usesCleartextTraffic="true"' "$M"
+grep -q 'CHANGE_WIFI_MULTICAST_STATE' "$M"
 
 JAVA=android/app/src/main/java/com/drifttank/game
 mkdir -p "$JAVA"

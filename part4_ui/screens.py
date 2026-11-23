@@ -366,38 +366,60 @@ class MapSelect:
 
 
 class JoinScreen:
+    """Join a friend: tap a game found on your Wi-Fi, or type the 5-digit room code (any network).
+    No IP addresses: hosts announce themselves on the Wi-Fi (part1_engine/lan.py)."""
+
+    BLOCKED_HINT = "This Wi-Fi may block it - ask the host to use HOST ONLINE and share the room code."
+
     def __init__(self, app):
         self.app = app
         self.backdrop = app.backdrop()
-        self.ip = ui.TextInput((W / 2 - 220, 300, 440, 60), app.prefs.get("last_ip", ""),
-                               "e.g. 48213  or  192.168.1.5",
-                               allowed="0123456789.", max_len=15)
-        self.name = ui.TextInput((W / 2 - 220, 410, 440, 60), app.prefs.get("name", ""), "your name (optional)",
-                                 max_len=12)
+        right = W / 2 + 40
+        last = app.prefs.get("last_ip", "")
+        self.code = ui.TextInput((right, 236, 360, 60), last if web.is_room_code(last) else "", "e.g. 48213",
+                                 allowed="0123456789" if web.IS_WEB else "0123456789.", max_len=15)
+        self.code.active = True
+        self.name = ui.TextInput((right, 352, 360, 56), app.prefs.get("name", ""), "your name (optional)", max_len=12)
         self.name.active = False
         self.status = None
-        self.connect_btn = ui.Button("CONNECT", (W / 2 - 170, 510, 340, 64), "connect")
+        self.connect_btn = ui.Button("JOIN ROOM", (right, 440, 360, 62), "connect")
         self.back_btn = ui.Button("BACK", (40, H - 80, 150, 48), "back", "ghost")
         self.pending = 0
+        self.target = None                 # room code or host address being joined
+        self.target_label = ""
         self.client = None                 # web version: connection being opened
         self.client_started = 0
-        self.keypad = []                   # web version: on-screen number pad (phones have no keyboard here)
+        self.keypad = []                   # phones: on-screen number pad
+        self.rows = []                     # [(rect, ip, info)] games found on the Wi-Fi
+        self.opened = pygame.time.get_ticks()
         if web.IS_WEB:
-            self.ip.active, self.name.active = True, False
-            self.ip.rect.y = 250
-            self.connect_btn.rect.topleft = (W / 2 + 250, 420)
-            keys = "123456789.0<"
+            keys = "123456789<0"
             for i, key in enumerate(keys):
                 col, row = i % 3, i // 3
-                self.keypad.append((key, pygame.Rect(W / 2 - 220 + col * 150, 330 + row * 78, 140, 68)))
+                self.keypad.append((key, pygame.Rect(right + col * 122, 312 + row * 64, 114, 56)))
+            self.connect_btn.rect.topleft = (right, 574)
+        # who can look for games on the Wi-Fi: the Mac/Windows app and the Android app
+        self.finder = None
+        if not web.IS_WEB:
+            from part1_engine.lan import LanFinder
+            self.finder = LanFinder()
+        elif web.can_host():
+            from part1_engine.webnet import WebFinder
+            self.finder = WebFinder()
         pygame.key.start_text_input()
+
+    def leave_screen(self, screen):
+        if self.finder is not None:
+            self.finder.close()
+            self.finder = None
+        self.app.go(screen)
 
     def press_key(self, key):
         play_sound("click")
         if key == "<":
-            self.ip.value = self.ip.value[:-1]
-        elif len(self.ip.value) < 15:
-            self.ip.value += key
+            self.code.value = self.code.value[:-1]
+        elif len(self.code.value) < 5:
+            self.code.value += key
 
     def handle_event(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -405,81 +427,130 @@ class JoinScreen:
                 if rect.collidepoint(event.pos):
                     self.press_key(key)
                     return
-        self.ip.handle_event(event)
-        self.name.handle_event(event)
+            for rect, ip, info in self.rows:
+                if rect.collidepoint(event.pos):
+                    self.join(ip, info.get("name", "HOST"))
+                    return
+        self.code.handle_event(event)
+        if not web.IS_WEB:
+            self.name.handle_event(event)
         if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_ESCAPE:
-                self.app.go(MainMenu(self.app))
-            elif event.key == pygame.K_TAB:
-                self.ip.active, self.name.active = self.name.active, self.ip.active
+            if event.key == pygame.K_ESCAPE and not web.IS_WEB:
+                self.leave_screen(MainMenu(self.app))
+            elif event.key == pygame.K_TAB and not web.IS_WEB:
+                self.code.active, self.name.active = self.name.active, self.code.active
             elif event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
                 self.connect()
         elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if self.connect_btn.rect.collidepoint(event.pos):
                 self.connect()
             elif self.back_btn.rect.collidepoint(event.pos):
-                self.app.go(MainMenu(self.app))
+                self.leave_screen(MainMenu(self.app))
 
     def connect(self):
-        if not (self.ip.value.count(".") == 3 or web.is_room_code(self.ip.value)):
-            hint = "Type the 5-digit room code (or a Wi-Fi host's IP like 192.168.1.5)"
-            self.status = (hint, (255, 140, 120))
+        value = self.code.value.strip()
+        if not (web.is_room_code(value) or value.count(".") == 3):
+            self.status = ("Type the 5-digit room code from the host's screen.", (255, 140, 120))
             play_sound("empty")
             return
+        self.join(value, "room %s" % value if web.is_room_code(value) else value)
+
+    def join(self, target, label):
+        if self.pending or self.client is not None:
+            return
         play_sound("confirm")
-        self.status = ("Connecting to %s ..." % self.ip.value, ui.TEXT)
-        self.pending = 2           # connect after the "Connecting" text has been drawn
+        self.target, self.target_label = target, label
+        self.status = ("Joining %s ..." % label, ui.TEXT)
+        self.pending = 2           # connect after the "Joining" text has been drawn
 
     def update_screen(self):
         self.backdrop.update()
+        if self.finder is not None:
+            self.finder.poll() if hasattr(self.finder, "poll") else None
         if self.pending:
             self.pending -= 1
             if self.pending == 0:
-                self.app.prefs["last_ip"] = self.ip.value
+                if web.is_room_code(self.target):
+                    self.app.prefs["last_ip"] = self.target
                 self.app.prefs["name"] = self.name.value
                 save_prefs(self.app.prefs)
                 if web.IS_WEB:
                     from part1_engine.webnet import WebClient
-                    self.client = WebClient(self.ip.value, self.name.value or web.cg_name())
+                    self.client = WebClient(self.target, self.name.value or web.cg_name())
                     self.client_started = pygame.time.get_ticks()
                     return
-                error = self.app.start_game("join", None, host_ip=self.ip.value, name=self.name.value)
+                error = self.app.start_game("join", None, host_ip=self.target, name=self.name.value)
                 if error:
+                    if not web.is_room_code(self.target):
+                        error = "Couldn't reach %s. %s" % (self.target_label, self.BLOCKED_HINT)
                     self.status = (error, (255, 140, 120))
+                elif self.finder is not None:
+                    self.finder.close()
         if self.client is not None:            # web version: wait for the host's "welcome"
             self.client.poll()
             if self.client.ready:
                 client, self.client = self.client, None
+                if self.finder is not None:
+                    self.finder.close()
                 self.app.start_game("join", None, name=self.name.value, network=client)
             elif self.client.error or pygame.time.get_ticks() - self.client_started > 8000:
-                self.status = (self.client.error or "No answer from %s. Same Wi-Fi? Is the host running?" % self.ip.value,
-                               (255, 140, 120))
+                if web.is_room_code(self.target):
+                    message = self.client.error or "No answer from room %s. Check the code." % self.target
+                else:
+                    message = "Couldn't reach %s. %s" % (self.target_label, self.BLOCKED_HINT)
+                self.status = (message, (255, 140, 120))
                 self.client.close()
                 self.client = None
 
     def draw(self, surf):
         now = pygame.time.get_ticks()
+        mouse = pygame.mouse.get_pos()
         self.backdrop.draw(surf, darker=True)
-        ui.title_text(surf, "JOIN A GAME", (W / 2, 110), 48)
-        tip = "Type the 5-digit ROOM CODE from the host's screen  -  or, on the same Wi-Fi, the host's IP."
-        ui.text(surf, tip, (W / 2, 170), 15, ui.MUTED, kind="narrow", anchor="midtop")
-        ui.text(surf, "ROOM CODE / HOST IP", (W / 2 - 220, self.ip.rect.y - 30), 16, ui.ACCENT)
-        self.ip.draw(surf, now)
+        ui.title_text(surf, "JOIN A GAME", (W / 2, 90), 48)
+        # ---- left: games on this Wi-Fi ----
+        left = pygame.Rect(60, 196, W / 2 - 100, 330)
+        ui.panel(surf, left, alpha=200)
+        ui.text(surf, "GAMES ON YOUR WI-FI", (left.x + 24, left.y + 18), 18, ui.ACCENT)
+        self.rows = []
+        if self.finder is None:
+            ui.text(surf, "Wi-Fi games need the Drift Tank app", (left.x + 24, left.y + 70), 16, ui.TEXT, kind="narrow")
+            ui.text(surf, "(Mac, Windows or Android). Here, use a room code.", (left.x + 24, left.y + 100), 16, ui.MUTED,
+                    kind="narrow")
+        else:
+            games = self.finder.games()[:4]
+            for i, (ip, info) in enumerate(games):
+                rect = pygame.Rect(left.x + 20, left.y + 60 + i * 66, left.w - 40, 58)
+                self.rows.append((rect, ip, info))
+                hover = rect.collidepoint(mouse)
+                ui.panel(surf, rect, color=(44, 52, 86) if hover else (30, 36, 62), alpha=240, radius=12)
+                mode = "BATTLEGROUND" if info.get("rules") == "br" else "TEAM DEATHMATCH"
+                ui.text(surf, "%s's game" % info.get("name", "HOST"), (rect.x + 18, rect.y + 8), 20, ui.TEXT)
+                ui.text(surf, "%s   -   %d / 4 players" % (mode, info.get("players", 1)), (rect.x + 18, rect.y + 34), 14,
+                        ui.MUTED, kind="narrow")
+                ui.text(surf, "JOIN", (rect.right - 18, rect.centery), 20, ui.ACCENT, anchor="midright")
+            if not games:
+                dots = "." * (1 + (now // 400) % 3)
+                ui.text(surf, "Looking for games" + dots, (left.x + 24, left.y + 70), 18, ui.TEXT, kind="narrow")
+                if now - self.opened > 6000:
+                    ui.text(surf, "Nothing yet? Make sure the host pressed", (left.x + 24, left.y + 112), 15, ui.MUTED,
+                            kind="narrow")
+                    ui.text(surf, "HOST ON WI-FI - or use a room code ->", (left.x + 24, left.y + 138), 15, ui.MUTED,
+                            kind="narrow")
+        # ---- right: room code ----
+        right = self.code.rect
+        ui.text(surf, "ROOM CODE  (any network)", (right.x, right.y - 32), 18, ui.ACCENT)
+        self.code.draw(surf, now)
         if self.keypad:
             for key, rect in self.keypad:
                 ui.panel(surf, rect, alpha=230, radius=12)
-                ui.text(surf, "DEL" if key == "<" else key, rect.center, 26, ui.TEXT, anchor="center")
+                ui.text(surf, "DEL" if key == "<" else key, rect.center, 24, ui.TEXT, anchor="center")
         else:
-            ui.text(surf, "NAME", (W / 2 - 220, 380), 16, ui.ACCENT)
+            ui.text(surf, "NAME", (self.name.rect.x, self.name.rect.y - 28), 16, ui.ACCENT)
             self.name.draw(surf, now)
         self.connect_btn.draw(surf, True)
-        self.back_btn.draw(surf, self.back_btn.rect.collidepoint(pygame.mouse.get_pos()))
+        self.back_btn.draw(surf, self.back_btn.rect.collidepoint(mouse))
         if self.status:
-            pos = (W / 2, H - 50) if self.keypad else (W / 2, 600)
-            ui.text(surf, self.status[0], pos, 15, self.status[1], kind="narrow", anchor="midtop")
-        if not self.keypad:
-            ui.text(surf, "Playing on a phone? Open the address shown at the bottom of the host's screen in your phone browser.",
-                    (W / 2, H - 40), 13, ui.MUTED, kind="narrow", anchor="midtop")
+            ui.text(surf, self.status[0], (W / 2, H - 46), 15, self.status[1], kind="narrow", anchor="midtop")
 
 
 class SettingsScreen:
@@ -581,7 +652,7 @@ class HelpScreen:
             ("THE RULES", ui.ACCENT),
             ("You start with NO weapon.", ui.TEXT),
             ("Drive over a loot crate to get one.", ui.TEXT),
-            ("Star box = random weapon.  Cross = +40 health.", ui.TEXT),
+            ("Star box = random weapon.  Cross = +60 health.", ui.TEXT),
             ("Ammo runs out - grab the next crate!", ui.TEXT),
             ("Red barrels explode. Bushes hide you.", ui.TEXT),
             ("BATTLEGROUND: 1 life, zone shrinks.", ui.TEXT),

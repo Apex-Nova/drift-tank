@@ -58,6 +58,10 @@ class Host:
         self.server.bind(("0.0.0.0", PORT))
         self.server.listen()
         threading.Thread(target=self.accept_players, daemon=True).start()
+        self.host_name = "HOST"
+        from part1_engine.lan import LanBeacon        # tell the Wi-Fi "a game is here" every second
+        self.beacon = LanBeacon(lambda: {"name": self.host_name, "players": 1 + len(self.connected_ids()),
+                                         "rules": self.rules, "map": self.map_id})
         self.phone_server = None
         if start_phones:
             from part1_engine.phone import PhoneServer
@@ -160,6 +164,7 @@ class Host:
         return "http://%s:%d" % (get_lan_ip(), Settings.PHONE_PORT)
 
     def close(self):
+        self.beacon.close()
         try:
             self.server.close()
         except OSError:

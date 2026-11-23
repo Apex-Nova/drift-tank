@@ -68,12 +68,25 @@ class Bot:
                 goal = center
         crates = [c for c in game.loot.crates if zone is None or Vector2(c.pos).distance_to((zone["x"], zone["y"])) < zone["r"]]
 
-        if goal is None and (tank.weapon is None or (tank.health < 40 and any(c.kind == "health" for c in crates))):
+        if goal is None and (tank.weapon is None or (tank.health < tank.max_health * 0.4 and any(c.kind == "health" for c in crates))):
             wanted = "health" if tank.weapon is not None else "weapon"
             choices = [c for c in crates if c.kind == wanted] or crates
             if choices:
                 goal = min(choices, key=lambda c: c.pos.distance_to(tank.pos)).pos
-        if goal is None and target is not None:
+        # Only fight enemies we could actually see (about one screen away). Before, every armed bot
+        # drove straight at the nearest enemy anywhere on the map: everyone met at once and a
+        # Battleground match was over in ~30 s. Out of sight, bots loot and roam instead.
+        sight = 380 if game.rules == "br" else 700
+        if target is not None and target.pos.distance_to(tank.pos) > sight:
+            target_in_sight = False
+            if goal is None and crates:
+                goal = min(crates, key=lambda c: c.pos.distance_to(tank.pos)).pos
+            elif goal is None and zone is not None and random.random() < 0.02:
+                self.wander = (Vector2(zone["x"], zone["y"]) - tank.pos).normalize() if \
+                    Vector2(zone["x"], zone["y"]) != tank.pos else self.wander
+        else:
+            target_in_sight = target is not None
+        if goal is None and target_in_sight:
             to_target = target.pos - tank.pos
             distance = to_target.length()
             if distance > 200:
@@ -96,7 +109,7 @@ class Bot:
                 direction = direction.rotate(70 if self.player_id % 2 else -70)
             inputs["move_x"], inputs["move_y"] = direction.x, direction.y
 
-        if target is not None and tank.weapon is not None:
+        if target_in_sight and tank.weapon is not None:
             to_target = target.pos + target.velocity * 10 - tank.pos
             aim = Vector2(1, 0).angle_to(to_target) + random.uniform(-8, 8) * (1 - self.skill)
             inputs["aim_angle"] = aim

@@ -224,7 +224,7 @@ def draw(game, surf):
     line = None
     if info and game.phase not in ("over", "lobby"):
         ip, phone = info
-        line = "LAPTOPS JOIN:  %s" % ip + ("      PHONES OPEN:  %s" % phone if phone else "")
+        line = "Friends on this Wi-Fi: JOIN GAME finds this game" + ("      PHONE AS CONTROLLER:  %s" % phone if phone else "")
         if getattr(game.network, "online", False) and ip[:1].isdigit():
             line = "ROOM CODE:  %s      friends: JOIN GAME and type this code" % ip
         if not ip[:1].isdigit():                # "starting..." or an error message
@@ -290,7 +290,7 @@ def _lobby(game, surf):
         if getattr(game.network, "online", False) and ip[:1].isdigit():
             sub = "ROOM CODE  %s   -  friends tap JOIN GAME and type it" % ip
         elif ip[:1].isdigit():
-            sub = "SAME WI-FI: JOIN GAME with  %s" % ip + ("     PHONE CONTROLLER: %s" % phone if phone else "")
+            sub = "Friends on this Wi-Fi: tap JOIN GAME - this game shows up in their list"
         else:
             sub = ip
         ui.text(surf, sub, (sw / 2, 140), 18, ui.ACCENT, kind="narrow", anchor="midtop")
