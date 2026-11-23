@@ -108,7 +108,7 @@ class MainMenu:
                 ui.Button("MAPS", (x + 262, y, 68, 62), "local", "ghost", size=14),
                 ui.Button("HOST ONLINE", (x, y + 76, 330, 54), "host_online", "ghost", sub="room code - play with anyone"),
                 ui.Button("HOST ON WI-FI", (x, y + 140, 330, 54), "host", "ghost", sub="laptops + phones nearby"),
-                ui.Button("JOIN GAME", (x, y + 204, 330, 54), "join", "ghost", sub="room code or host IP"),
+                ui.Button("JOIN GAME", (x, y + 204, 330, 54), "join", "ghost", sub="Wi-Fi games or room code"),
                 ui.Button("HOW TO PLAY", (x, y + 268, 158, 46), "help", "ghost", size=15),
                 ui.Button("SETTINGS", (x + 172, y + 268, 158, 46), "settings", "ghost", size=15),
             ])
@@ -129,7 +129,7 @@ class MainMenu:
                 ui.Button("MAPS", (x + 262, y - 20, 68, 62), "local", "ghost", size=14),
                 ui.Button("HOST ONLINE", (x, y + 56, 330, 54), "host_online", "ghost", sub="room code - play with anyone"),
                 ui.Button("HOST ON WI-FI", (x, y + 120, 330, 54), "host", "ghost", sub="laptops + phones nearby"),
-                ui.Button("JOIN GAME", (x, y + 184, 330, 54), "join", "ghost", sub="room code or host IP"),
+                ui.Button("JOIN GAME", (x, y + 184, 330, 54), "join", "ghost", sub="Wi-Fi games or room code"),
                 ui.Button("HOW TO PLAY", (x, y + 248, 158, 46), "help", "ghost", size=15),
                 ui.Button("SETTINGS", (x + 172, y + 248, 158, 46), "settings", "ghost", size=15),
                 ui.Button("QUIT", (x, y + 304, 330, 46), "quit", "ghost"),

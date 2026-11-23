@@ -15,4 +15,6 @@ mv www/drift-tank.tar.gz www/drift-tank.tgzdata
 rm -f www/drift-tank.apk          # zip copy of the same files, not needed in the app
 sed -i.bak 's/drift-tank\.tar\.gz/drift-tank.tgzdata/g' www/index.html && rm www/index.html.bak
 grep -q "drift-tank.tgzdata" www/index.html
+# Python + Pygame for the browser go inside the app too, so it starts with no internet
+python3 ../tools/offline_runtime.py www
 echo "www/ ready"
