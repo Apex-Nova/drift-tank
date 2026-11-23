@@ -70,6 +70,16 @@ def get_image(name, scale=1.0, rotate=0, size=None):
 
 
 # ---------------- fonts ----------------
+def readable_size(size, kind):
+    """Small UI text is drawn bigger than asked: the game can be shown as small as 800x450
+    (CrazyGames' smallest window) and must stay readable there. Titles keep their size."""
+    if kind == "title" or size >= 22:
+        return size
+    if kind == "pixel":                       # tiny labels over tanks
+        return max(size, 11)
+    return max(size, round(size * 1.35), 16)
+
+
 def get_font(size, kind="future"):
     """kind: 'title' (Bungee - big chunky titles), 'future' + 'narrow' (Pixelify Sans - UI and HUD),
     'pixel' (Kenney pixel font - tiny labels over tanks)."""
@@ -77,8 +87,9 @@ def get_font(size, kind="future"):
     if key not in _fonts:
         files = {"title": "bungee.ttf", "future": "pixelify.ttf", "narrow": "pixelify.ttf", "pixel": "pixel.ttf"}
         path = os.path.join(ASSET_DIR, "fonts", files.get(kind, "future.ttf"))
+        real = readable_size(size, kind)
         try:
-            _fonts[key] = pygame.font.Font(path, size)
+            _fonts[key] = pygame.font.Font(path, real)
         except (OSError, FileNotFoundError):
             _fonts[key] = pygame.font.Font(None, int(size * 1.3))
     return _fonts[key]

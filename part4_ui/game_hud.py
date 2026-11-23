@@ -15,6 +15,7 @@ from part2_combat.weapons import WEAPONS
 from part3_world.maps import WORLD_W, WORLD_H
 from part4_ui import ui, art
 from part4_ui.assets import get_font, play_sound
+from shared import web
 
 _buttons = []
 _minimaps = {}
@@ -31,6 +32,8 @@ def handle_click(game, pos):
                 game.leave()
             elif action == "again":
                 game.start_match()
+            elif action == "pause":
+                game.paused = True
             elif action == "start":
                 game.begin_match()
             elif action == "ready":
@@ -208,6 +211,13 @@ def draw(game, surf):
         rule = "BATTLEGROUND  -  one life, stay inside the zone" if game.rules == "br" else \
             "TEAM DEATHMATCH  -  RED vs BLUE, first to %d" % Settings.KILL_LIMIT
         ui.text(surf, rule, (sw / 2, sh / 2 + 10), 16, ui.TEXT, anchor="midtop")
+        # first-time players: the goal + controls, big, while the countdown runs
+        box = ui.panel(surf, (sw / 2 - 330, sh / 2 + 52, 660, 112), alpha=200, radius=14)
+        ui.text(surf, "DRIVE OVER A CRATE FOR A WEAPON  -  THEN SHOOT!", (sw / 2, box.y + 16), 20, ui.ACCENT,
+                anchor="midtop")
+        controls = "LEFT STICK drive     RIGHT STICK aim + fire" if game.touch.active else \
+            "WASD drive     MOUSE aim     CLICK fire"
+        ui.text(surf, controls, (sw / 2, box.y + 62), 20, ui.TEXT, anchor="midtop")
 
     # ---- bottom: how to join / controls ----
     info = game.join_info()
@@ -228,6 +238,13 @@ def draw(game, surf):
         box = ui.panel(surf, (sw / 2 - img.get_width() / 2 - 14, sh - 36, img.get_width() + 28, 26), alpha=190, radius=8)
         surf.blit(img, (box.x + 14, box.y + 6))
 
+    # web, mouse players: a clickable pause button (Esc can't be used in browsers - it leaves fullscreen)
+    if web.IS_WEB and not game.touch.active and game.phase in ("countdown", "playing") and not game.paused:
+        from part1_engine.touch import PAUSE_RECT
+        ui.panel(surf, PAUSE_RECT, alpha=170, radius=10)
+        for dx in (-8, 4):
+            pygame.draw.rect(surf, ui.TEXT, (PAUSE_RECT.centerx + dx, PAUSE_RECT.y + 12, 5, 20))
+        _buttons.append((pygame.Rect(PAUSE_RECT), "pause"))
     if game.phase == "lobby":
         _lobby(game, surf)
     elif game.phase == "over":

@@ -28,7 +28,8 @@ window.dtSfx = window.dtSfx || {
       if (!C) return null;
       this.ctx = new C();
       const wake = () => { if (this.ctx.state !== "running") this.ctx.resume(); };
-      ["pointerdown", "touchstart", "keydown"].forEach(e => document.addEventListener(e, wake, true));
+      // iOS only lets audio start inside a tap: touchend / click (touchstart alone is not enough)
+      ["pointerdown", "touchstart", "touchend", "click", "keydown"].forEach(e => document.addEventListener(e, wake, true));
     }
     return this.ctx;
   },
@@ -102,6 +103,7 @@ window.dtCG = window.dtCG || {
       this.ready = true;
       this.call(S => S.game.loadingStart());
       this.instant = !!S.game.isInstantMultiplayer;
+      try { this.device = (S.user.systemInfo.device.type || "").toLowerCase(); } catch (e) { this.device = ""; }
       this.invite = S.game.getInviteParam("room");
       const settings = S.game.settings || {};
       this.muted = !!settings.muteAudio;
