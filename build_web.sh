@@ -38,6 +38,7 @@ if [ "$1" = "serve" ]; then
 else
   python -m pygbag --build --ume_block 0 --title "Drift Tank" "$OUT"
   cp -R build/web/music build/web/sfx "$OUT/build/web/"
+  python tools/brand_web_page.py "$OUT/build/web/index.html"     # game colours on the loading page
   echo "Done -> $OUT/build/web/"
   if [ "$1" = "crazygames" ]; then
     # CrazyGames upload: their uploader refuses archive files (.tar.gz / .apk), so the game data

@@ -860,9 +860,11 @@ class Game:
         elif event.type == pygame.KEYDOWN:
             if event.key in BARREL_KEYS:
                 self.mouse_active = False          # keys take the barrel back from the mouse
-            if event.key == pygame.K_ESCAPE:
+            pause_key = pygame.K_p if web.IS_WEB else pygame.K_ESCAPE   # Esc leaves fullscreen in browsers
+            if event.key in (pause_key, pygame.K_p):
                 if self.phase in ("over", "lobby"):
-                    self.leave()
+                    if event.key == pygame.K_ESCAPE:
+                        self.leave()
                 else:
                     self.paused = not self.paused
                     play_sound("click")

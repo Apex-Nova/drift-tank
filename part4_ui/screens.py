@@ -33,7 +33,7 @@ class Backdrop:
             a = int(230 * max(0.0, 1 - x / (W * 0.62)) ** 1.2)
             pygame.draw.line(self.shade, (8, 10, 18, a), (x, 0), (x, H))
         self.vignette = ui.vignette((W, H), 170)
-        self.hero = get_image("hero") if has_image("hero") else None
+        self.hero = None           # menus show the live pixel-art battle only (same art style as the game)
         self.hero_frames = {}
 
     def update(self):
@@ -104,7 +104,8 @@ class MainMenu:
         if web.IS_WEB and web.can_host():
             # Android app: internet rooms (relay server) AND Wi-Fi hosting (native DriftNet plugin).
             self.menu = ui.ButtonList([
-                ui.Button("PLAY", (x, y, 330, 62), "local", "primary", sub="you vs bots"),
+                ui.Button("PLAY", (x, y, 252, 62), "quick", "primary", sub="quick match vs bots"),
+                ui.Button("MAPS", (x + 262, y, 68, 62), "local", "ghost", size=14),
                 ui.Button("HOST ONLINE", (x, y + 76, 330, 54), "host_online", "ghost", sub="room code - play with anyone"),
                 ui.Button("HOST ON WI-FI", (x, y + 140, 330, 54), "host", "ghost", sub="laptops + phones nearby"),
                 ui.Button("JOIN GAME", (x, y + 204, 330, 54), "join", "ghost", sub="room code or host IP"),
@@ -115,7 +116,8 @@ class MainMenu:
             # Website: a browser tab can't open ports, so online play goes through the
             # relay server with room codes (works anywhere with internet).
             self.menu = ui.ButtonList([
-                ui.Button("PLAY", (x, y, 330, 62), "local", "primary", sub="you vs bots"),
+                ui.Button("PLAY", (x, y, 252, 62), "quick", "primary", sub="quick match vs bots"),
+                ui.Button("MAPS", (x + 262, y, 68, 62), "local", "ghost", size=14),
                 ui.Button("HOST ONLINE", (x, y + 76, 330, 54), "host_online", "ghost", sub="get a room code for friends"),
                 ui.Button("JOIN GAME", (x, y + 140, 330, 54), "join", "ghost", sub="type a friend's room code"),
                 ui.Button("HOW TO PLAY", (x, y + 204, 158, 46), "help", "ghost", size=15),
@@ -123,7 +125,8 @@ class MainMenu:
             ])
         else:
             self.menu = ui.ButtonList([
-                ui.Button("PLAY", (x, y - 20, 330, 62), "local", "primary", sub="you vs bots"),
+                ui.Button("PLAY", (x, y - 20, 252, 62), "quick", "primary", sub="quick match vs bots"),
+                ui.Button("MAPS", (x + 262, y - 20, 68, 62), "local", "ghost", size=14),
                 ui.Button("HOST ONLINE", (x, y + 56, 330, 54), "host_online", "ghost", sub="room code - play with anyone"),
                 ui.Button("HOST ON WI-FI", (x, y + 120, 330, 54), "host", "ghost", sub="laptops + phones nearby"),
                 ui.Button("JOIN GAME", (x, y + 184, 330, 54), "join", "ghost", sub="room code or host IP"),
@@ -134,9 +137,12 @@ class MainMenu:
 
     def handle_event(self, event):
         action = self.menu.handle_event(event)
-        if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE and not web.IS_WEB:
             action = "quit"
-        if action == "local":
+        if action == "quick":                  # one click from the menu into a match
+            play_sound("confirm")
+            self.app.start_game("local", random.choice(MAPS)["id"], bots=3, rules=self.app.prefs.get("rules", "br"))
+        elif action == "local":
             self.app.go(MapSelect(self.app, "local"))
         elif action == "host":
             self.app.go(MapSelect(self.app, "host"))
@@ -159,7 +165,7 @@ class MainMenu:
         self.backdrop.draw(surf, show_hero=True)
         draw_logo(surf, (235, 160), now)
         self.menu.draw(surf)
-        ui.text(surf, "%s   -   Art & sound: Kenney.nl (CC0)" % VERSION, (70, H - 30), 11, ui.MUTED, kind="narrow")
+        ui.text(surf, "%s   -   Original game - some art from Kenney.nl (CC0)" % VERSION, (70, H - 30), 11, ui.MUTED, kind="narrow")
         if self.backdrop.hero_mix(now) < 0.5:
             ui.text(surf, "LIVE: bots battling on %s" % self.backdrop.game.map.name.upper(), (W - 30, H - 30), 11,
                     ui.MUTED, kind="narrow", anchor="topright")
@@ -169,14 +175,14 @@ class MainMenu:
 
 
 class IntroScreen:
-    """2.5 second splash when the game opens: hero art zooms in, logo drops in. Any key skips."""
+    """2.5 second splash when the game opens (desktop): the live battle, logo drops in. Any key skips."""
 
     LENGTH = 2600
 
     def __init__(self, app):
         self.app = app
         self.start = pygame.time.get_ticks()
-        self.hero = get_image("hero") if has_image("hero") else None
+        self.backdrop = app.backdrop()      # the live pixel-art battle (same style as the game)
         self.played = False
 
     def done(self):
@@ -190,17 +196,13 @@ class IntroScreen:
         if not self.played:
             self.played = True
             play_sound("big_explosion", 0.5)
+        self.backdrop.update()
         if pygame.time.get_ticks() - self.start > self.LENGTH:
             self.done()
 
     def draw(self, surf):
         t = (pygame.time.get_ticks() - self.start) / self.LENGTH
-        surf.fill((0, 0, 0))
-        if self.hero is not None:
-            zoom = 1.25 - 0.2 * min(1.0, t)
-            img = pygame.transform.smoothscale(self.hero, (int(W * zoom), int(H * zoom)))
-            img.set_alpha(int(255 * min(1.0, t * 3) * (1 - max(0.0, t - 0.85) / 0.15)))
-            surf.blit(img, ((W - img.get_width()) / 2, (H - img.get_height()) / 2))
+        self.backdrop.draw(surf, darker=True)
         dim = pygame.Surface((W, H), pygame.SRCALPHA)
         dim.fill((0, 0, 0, 90))
         surf.blit(dim, (0, 0))
@@ -232,7 +234,7 @@ class MapSelect:
         for i in range(4):
             self.cards.append(pygame.Rect((W - total) / 2 + i * (cw + gap), 220, cw, ch))
         self.mode_btns = [(pygame.Rect(W / 2 - 330, 140, 320, 50), "br"), (pygame.Rect(W / 2 + 10, 140, 320, 50), "tdm")]
-        self.shuffle_btn = pygame.Rect(W / 2 - 80, 452, 160, 34)
+        self.shuffle_btn = pygame.Rect(W / 2 - 80, 470, 160, 34)
         self.rows = []                     # (label, attr, min, max)
         self.rows.append(("BOTS", "bots", 0, 3))
         self.start_btn = ui.Button("START BATTLE" if mode == "local" else "START HOSTING", (W / 2 - 170, 612, 340, 62), "start")
@@ -341,7 +343,7 @@ class MapSelect:
             surf.blit(self.preview(i), rr)
             pygame.draw.rect(surf, ui.ACCENT if selected else (255, 255, 255), rr, 4 if selected else 1, border_radius=12)
             ui.text(surf, MAPS[i]["name"].upper(), (rr.centerx, rr.bottom + 10), 18, ui.ACCENT if selected else ui.TEXT, anchor="midtop")
-        ui.text(surf, MAPS[self.index]["blurb"], (W / 2, 430), 14, ui.TEXT, kind="narrow", anchor="center")
+        ui.text(surf, MAPS[self.index]["blurb"], (W / 2, 446), 14, ui.TEXT, kind="narrow", anchor="center")
         pygame.draw.rect(surf, (40, 46, 66) if self.shuffle_btn.collidepoint(mouse) else (26, 30, 44), self.shuffle_btn, border_radius=10)
         pygame.draw.rect(surf, (90, 96, 116), self.shuffle_btn, 2, border_radius=10)
         ui.text(surf, "SHUFFLE MAP (R)", self.shuffle_btn.center, 12, ui.TEXT, anchor="center", shadow=False)
@@ -356,7 +358,7 @@ class MapSelect:
         ui.text(surf, "%d TANKS IN THIS BATTLE" % self.total_players(), (W / 2, 600), 11, ui.MUTED, kind="narrow", anchor="midbottom")
         self.start_btn.draw(surf, True)
         self.back_btn.draw(surf, self.back_btn.rect.collidepoint(mouse))
-        ui.text(surf, "ARROWS map   TAB mode   R shuffle   ENTER start   ESC back", (W - 40, H - 62), 11, ui.MUTED,
+        ui.text(surf, "ARROWS map   TAB mode   R shuffle   ENTER start", (W - 40, H - 62), 11, ui.MUTED,
                 kind="narrow", anchor="topright")
         if self.error:
             r = ui.panel(surf, (W / 2 - 330, 680, 660, 32), color=(80, 20, 20), alpha=220)
@@ -485,7 +487,8 @@ class SettingsScreen:
         self.app = app
         self.backdrop = app.backdrop()
         self.focus = 0
-        self.rows = ["volume", "music", "fullscreen", "fps", "back"]
+        # in a browser the site gives fullscreen (CrazyGames does not allow a game's own button)
+        self.rows = ["volume", "music", "fps", "back"] if web.IS_WEB else ["volume", "music", "fullscreen", "fps", "back"]
 
     def toggle(self, row, direction=1):
         prefs = self.app.prefs
@@ -577,22 +580,21 @@ class HelpScreen:
         lines = [
             ("THE RULES", ui.ACCENT),
             ("You start with NO weapon.", ui.TEXT),
-            ("Loot crates drop from the sky - drive over one!", ui.TEXT),
-            ("Green star box = random weapon. Coloured box = you can", ui.TEXT),
-            ("see the weapon. White box + green cross = +40 health.", ui.TEXT),
-            ("Ammo is limited. Empty = find the next crate.", ui.TEXT),
-            ("Red barrels explode. Bushes hide you. Ice is slippery.", ui.TEXT),
-            ("BATTLEGROUND: 1 life, the zone shrinks, last tank wins.", ui.TEXT),
-            ("TEAM DEATHMATCH: red vs blue, first team to %d kills." % Settings.KILL_LIMIT, ui.TEXT),
+            ("Drive over a loot crate to get one.", ui.TEXT),
+            ("Star box = random weapon.  Cross = +40 health.", ui.TEXT),
+            ("Ammo runs out - grab the next crate!", ui.TEXT),
+            ("Red barrels explode. Bushes hide you.", ui.TEXT),
+            ("BATTLEGROUND: 1 life, zone shrinks.", ui.TEXT),
+            ("TEAM DEATHMATCH: first team to %d kills." % Settings.KILL_LIMIT, ui.TEXT),
             ("CONTROLS", ui.ACCENT),
             ("DRIVE: WASD or ARROWS", ui.TEXT),
-            ("AIM: MOUSE, or Q/E or J/K to turn the barrel", ui.TEXT),
-            ("FIRE: SPACE or LEFT CLICK", ui.TEXT),
-            ("PHONE: left stick drive, right stick aim (push far = fire)", ui.TEXT),
-            ("ESC pause   -   F11 fullscreen", ui.TEXT),
+            ("AIM: MOUSE  (or Q/E, J/K)", ui.TEXT),
+            ("FIRE: LEFT CLICK or SPACE", ui.TEXT),
+            ("PHONE: left stick drive, right stick aim + fire", ui.TEXT),
+            ("P pause" if web.IS_WEB else "ESC or P pause  -  F11 fullscreen", ui.TEXT),
         ]
         for i, (line, color) in enumerate(lines):
-            ui.text(surf, line, (left.x + 28, left.y + 26 + i * 34), 16 if color == ui.TEXT else 20, color,
+            ui.text(surf, line, (left.x + 28, left.y + 24 + i * 36), 14 if color == ui.TEXT else 20, color,
                     kind="narrow" if color == ui.TEXT else "future")
         right = ui.panel(surf, (650, 120, 570, 520))
         ui.text(surf, "WEAPONS", (right.x + 28, right.y + 26), 20, ui.ACCENT)
@@ -601,7 +603,7 @@ class HelpScreen:
             "cannon": "Heavy shell with a small blast.",
             "shotgun": "7 pellets. Brutal up close.",
             "rocket": "Speeds up, big explosion. Rare!",
-            "railgun": "Instant beam that pierces tanks. Very rare!",
+            "railgun": "Instant beam, pierces tanks. Rare!",
             "bouncer": "Bounces off walls 3 times.",
         }
         for i, key in enumerate(WEAPON_ORDER):

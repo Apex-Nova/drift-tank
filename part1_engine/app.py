@@ -59,7 +59,8 @@ class App:
         elif mode in ("host", "local"):
             self.screen = MapSelect(self, mode)
         if self.screen is None:
-            self.screen = IntroScreen(self)
+            # web: no "press any key" splash - straight to the menu (one click from PLAY to a match)
+            self.screen = MainMenu(self) if web.IS_WEB else IntroScreen(self)
 
     def backdrop(self):
         """One shared live bot battle for all menu screens."""
@@ -109,7 +110,7 @@ class App:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
-            elif event.type == pygame.KEYDOWN and event.key == pygame.K_F11:
+            elif event.type == pygame.KEYDOWN and event.key == pygame.K_F11 and not web.IS_WEB:
                 self.prefs["fullscreen"] = not self.prefs.get("fullscreen", False)
                 self.set_fullscreen(self.prefs["fullscreen"])
                 save_prefs(self.prefs)
@@ -167,14 +168,17 @@ class App:
             self.start_game("host", random.choice(MAPS)["id"], bots=0, online=True)
 
     def updates_this_frame(self):
-        """The game logic is made for 60 updates a second. On desktop we draw 60 frames a second,
-        so it's 1 update per frame. A phone may only manage 30 frames: then we update twice per
-        frame so tanks still move at the right speed (they just look a bit less smooth)."""
+        """The game logic is made for exactly 60 updates a second (speeds are 'per update').
+        Desktop: the window is capped at 60 frames a second -> 1 update per frame.
+        Browser: the screen decides the frame rate. A 144 Hz monitor draws 144 frames a second,
+        so most frames get 0 updates; a slow phone at 30 frames gets 2. The game then runs at the
+        same speed everywhere (CrazyGames tests 60 / 144 / 165 Hz screens)."""
         if sys.platform != "emscripten":
             return 1
-        self.lag_ms = min(self.lag_ms + self.frame_ms, 1000 / 60 * 4)
-        updates = max(1, min(2, round(self.lag_ms / (1000 / 60))))   # at most 2: more would slow it further
-        self.lag_ms = max(-1000 / 60, self.lag_ms - updates * 1000 / 60)
+        step = 1000 / 60
+        self.lag_ms = min(self.lag_ms + self.frame_ms, step * 4)
+        updates = min(2, int(self.lag_ms // step))      # at most 2 per frame: more would slow it further
+        self.lag_ms = self.lag_ms - updates * step if updates < 2 else 0.0
         return updates
 
     def is_echo_of_touch(self, event):

@@ -54,6 +54,10 @@ class TouchControls:
             return False
         try:
             import platform as web           # in pygbag, platform.window is the browser's window
+            # On CrazyGames ask their SDK what device this is (they ask games not to guess from touch)
+            device = str(web.window.eval("(window.dtCG && dtCG.device) || ''"))
+            if device:
+                return device != "desktop"
             return int(web.window.navigator.maxTouchPoints) > 0
         except Exception:
             return False
