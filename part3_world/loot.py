@@ -5,7 +5,7 @@
 # Every few seconds a crate falls onto the map (up to MAX_CRATES).
 #   "weapon"  mystery crate (?)   -> random weapon, full ammo
 #   "weapon"  marked crate        -> you can SEE which weapon is inside
-#   "health"  green cross         -> +40 health
+#   "health"  green cross         -> +60 health
 # A crate can only be picked up after it has landed.
 # =====================================================================
 import random

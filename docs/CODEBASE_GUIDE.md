@@ -54,6 +54,13 @@ Web version (pygbag compiles Python + Pygame to WebAssembly so it runs in a brow
 ```bash
 ./build_web.sh serve  # test at http://localhost:8000   (./build_web.sh alone = build only)
 ```
+Before every release, run the soak test. It plays full matches on every map headless (fast fake clock),
+plus LAN with a laptop, phone and controller, and reports crashes or impossible states (tank off the map,
+weapon with 0 ammo...). It also told us Battleground fights were too short, so tanks now have 160 health
+and bots only fight enemies within about one screen:
+```bash
+.venv/bin/python tools/soak_test.py            # add --online to also test a room through the relay
+```
 How the web/phone versions work:
 - `App.run()` is **async**: each frame ends with `await asyncio.sleep(0)`, which hands control
   back to the browser (a browser tab can't run a never-ending `while` loop).
@@ -319,6 +326,13 @@ conn.sendall("hi".encode());  data = conn.recv(1024).decode()                   
 ### Lesson 2 — Two computers (`net2`)
 The host's address on the Wi-Fi is found with a trick: "connect" a UDP socket to 8.8.8.8 (nothing is sent)
 and ask which local IP it would use → `get_lan_ip()`. College Wi-Fi often blocks device-to-device traffic → use a phone hotspot.
+
+**Nobody types that IP any more** (`part1_engine/lan.py`). The host shouts a tiny UDP *broadcast*
+(`DRIFTTANK1 {"name": ..., "players": ...}`) to every device on the Wi-Fi once a second on port 5758.
+The JOIN screen listens on that port and lists every game it heard in the last 3 s; the sender's
+address arrives with the message, so tapping a row is all it takes. The Android app does the same
+in Java (`DriftNetPlugin.announce/find`, needs a Wi-Fi *multicast lock* or Android drops broadcasts).
+If the list stays empty the Wi-Fi blocks it — use HOST ONLINE and a room code instead.
 
 ### Lesson 3 — Messages as JSON lines (`net3`)
 TCP is a **stream**, not separate messages: 3 sends can arrive glued together or cut in half.

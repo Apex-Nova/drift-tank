@@ -146,11 +146,13 @@ class Game:
                 # online=True: internet room (relay). The website can only do that (no ports).
                 self.network = WebHost(self.map.id, self.rules, reserved=set(bot_ids), seed=self.map.seed,
                                        online=online or not web.can_host())
+                self.network.host_name = (name or "HOST")[:12]
             elif online:          # Mac / Windows: internet room through the relay
                 from part1_engine.relaynet import RelayHost
                 self.network = RelayHost(self.map.id, self.rules, reserved=set(bot_ids), seed=self.map.seed)
             else:
                 self.network = Host(self.map.id, self.rules, reserved=set(bot_ids), seed=self.map.seed)
+                self.network.host_name = (name or "HOST")[:12]   # shown in joiners' "games on your Wi-Fi" list
         elif mode == "demo":
             self.rules = "tdm"
             for player_id in range(1, 5):

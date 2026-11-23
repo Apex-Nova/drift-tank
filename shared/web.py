@@ -210,10 +210,26 @@ window.dtNet = window.dtNet || {
     if (this.relay) { this.relaySend({kick: id}); return; }
     const p = this.plugin(); if (p) p.kick({id: id});
   },
+  // ---- Wi-Fi game finder (Android app; same announcements as part1_engine/lan.py) ----
+  found: {},
+  find() {
+    const p = this.plugin(); if (!p) return;
+    if (!this.finding) {
+      this.finding = true;
+      p.addListener("found", (e) => { this.found[e.ip] = {info: e.info, t: Date.now()}; });
+    }
+    p.find().catch(() => {});
+  },
+  stopFind() { const p = this.plugin(); if (p) p.stopFind().catch(() => {}); },
+  foundList() {
+    const now = Date.now();
+    return JSON.stringify(Object.entries(this.found).filter(([ip, v]) => now - v.t < 3000).map(([ip, v]) => [ip, v.info]));
+  },
+  announce(info) { const p = this.plugin(); if (p) p.announce({info: info}).catch(() => {}); },
   hostStop() {
     this.hosting = false;
     if (this.relay) { const r = this.relay; this.relay = null; try { r.close(); } catch (e) {} return; }
-    const p = this.plugin(); if (p && this.listening) p.stop();
+    const p = this.plugin(); if (p && this.listening) p.stop();   // also stops the Wi-Fi announcements
   },
   async lanIp() { const p = this.plugin(); if (!p) return ""; try { const r = await p.ip(); this.ip = r.ip || ""; } catch (e) {} return this.ip; }
 };

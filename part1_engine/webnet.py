@@ -112,6 +112,29 @@ class WebClient:
         web.js("dtNet.close()")
 
 
+class WebFinder:
+    """Android app: games announced on the Wi-Fi (same interface as lan.LanFinder)."""
+
+    def __init__(self):
+        web.js("dtNet.find()")
+
+    def games(self):
+        try:
+            rows = json.loads(str(web.js("dtNet.foundList()")))
+        except ValueError:
+            return []
+        games = []
+        for ip, info in rows:
+            try:
+                games.append((ip, json.loads(info)))
+            except ValueError:
+                pass
+        return games
+
+    def close(self):
+        web.js("dtNet.stopFind()")
+
+
 class _WebPhone:
     """A phone controller connected to the phone host (same send() as phone.PhoneConnection)."""
 
@@ -166,6 +189,10 @@ class WebHost:
     # ---------- messages from the native server ----------
     def poll(self):
         dt = web.window().dtNet
+        self.frame_polls = getattr(self, "frame_polls", 0) + 1
+        if not self.online and self.frame_polls % 60 == 1:     # announce the game on the Wi-Fi once a second
+            dt.announce(json.dumps({"name": getattr(self, "host_name", "HOST"), "players": 1 + len(self.connected_ids()),
+                                    "rules": self.rules, "map": self.map_id}))
         for item in _queue():
             kind = item.get("k")
             if kind == "hosting":

@@ -21,8 +21,9 @@ collaborative project.
 - **Room codes (internet, anywhere):** in every version (Mac, Windows, Android, website), *HOST ONLINE* gives a
   5-digit code; friends tap *JOIN GAME* and type it. Messages go through a tiny relay server
   ([server/](server/)), the host's device runs the match.
-- **Same Wi-Fi:** the Mac, Windows and Android apps can host on the local network; laptops join with
-  the host's IP, phones can also open `http://<host IP>:8080` as a controller.
+- **Same Wi-Fi (no IP, no code):** the Mac, Windows and Android apps can host on the local network.
+  Friends tap *JOIN GAME* and the game shows up in the *Games on your Wi-Fi* list; one tap joins.
+  Phones can also open `http://<host IP>:8080` as a controller.
   (The website can't do Wi-Fi play: browsers block web pages from reaching devices on your network.)
 - **Waiting room:** hosting opens a lobby. Players join and press *READY*; the host presses *START*.
 

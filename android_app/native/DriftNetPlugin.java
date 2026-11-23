@@ -26,12 +26,17 @@ import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
+import android.content.Context;
+import android.net.wifi.WifiManager;
+
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
 import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
@@ -55,6 +60,14 @@ public class DriftNetPlugin extends Plugin {
     private String page = "<h1>Drift Tank</h1>";
     private final AtomicInteger nextId = new AtomicInteger(1);
     private final Map<Integer, Conn> conns = new ConcurrentHashMap<>();
+
+    // ---- Wi-Fi game finder (same messages as part1_engine/lan.py) ----
+    private static final int FIND_PORT = 5758;
+    private static final String FIND_MAGIC = "DRIFTTANK1 ";
+    private volatile String beaconInfo = null;       // JSON; null = not announcing
+    private Thread beaconThread;
+    private DatagramSocket findSocket;
+    private WifiManager.MulticastLock multicastLock;
 
     /** One connected laptop or phone. */
     private static class Conn {
@@ -175,12 +188,97 @@ public class DriftNetPlugin extends Plugin {
     @Override
     protected void handleOnDestroy() {
         stopServers();
+        stopFinding();
+    }
+
+    /** Host: what to announce on the Wi-Fi (name, players...). Starts the beacon the first time. */
+    @PluginMethod
+    public void announce(PluginCall call) {
+        beaconInfo = call.getString("info");
+        if (beaconThread == null && beaconInfo != null) {
+            beaconThread = new Thread(this::beaconLoop, "drift-beacon");
+            beaconThread.start();
+        }
+        call.resolve();
+    }
+
+    private void beaconLoop() {
+        try (DatagramSocket sock = new DatagramSocket()) {
+            sock.setBroadcast(true);
+            while (beaconInfo != null) {
+                byte[] data = (FIND_MAGIC + beaconInfo).getBytes(StandardCharsets.UTF_8);
+                String ip = lanIp();
+                String[] targets = ip.isEmpty() ? new String[]{"255.255.255.255"}
+                        : new String[]{"255.255.255.255", ip.substring(0, ip.lastIndexOf('.')) + ".255"};
+                for (String t : targets) {
+                    try { sock.send(new DatagramPacket(data, data.length, InetAddress.getByName(t), FIND_PORT)); }
+                    catch (IOException ignored) { }
+                }
+                Thread.sleep(1000);
+            }
+        } catch (Exception ignored) { }
+        beaconThread = null;
+    }
+
+    /** Joiner: listen for hosts on the Wi-Fi; each heard host -> "found" {ip, info}. */
+    @PluginMethod
+    public void find(PluginCall call) {
+        if (findSocket == null) {
+            try {
+                WifiManager wifi = (WifiManager) getContext().getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+                if (wifi != null) {
+                    multicastLock = wifi.createMulticastLock("drift-find");   // let broadcasts reach the app
+                    multicastLock.setReferenceCounted(false);
+                    multicastLock.acquire();
+                }
+                DatagramSocket sock = new DatagramSocket(null);
+                sock.setReuseAddress(true);
+                sock.setBroadcast(true);
+                sock.bind(new java.net.InetSocketAddress(FIND_PORT));
+                findSocket = sock;
+                new Thread(() -> findLoop(sock), "drift-find").start();
+            } catch (Exception e) {
+                call.reject("Can't listen on the Wi-Fi: " + e.getMessage());
+                return;
+            }
+        }
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void stopFind(PluginCall call) {
+        stopFinding();
+        call.resolve();
+    }
+
+    private void findLoop(DatagramSocket sock) {
+        byte[] buf = new byte[2048];
+        while (!sock.isClosed()) {
+            try {
+                DatagramPacket p = new DatagramPacket(buf, buf.length);
+                sock.receive(p);
+                String text = new String(p.getData(), 0, p.getLength(), StandardCharsets.UTF_8);
+                if (!text.startsWith(FIND_MAGIC)) continue;
+                JSObject data = new JSObject();
+                data.put("ip", p.getAddress().getHostAddress());
+                data.put("info", text.substring(FIND_MAGIC.length()));
+                notifyListeners("found", data);
+            } catch (IOException e) {
+                break;
+            }
+        }
+    }
+
+    private void stopFinding() {
+        if (findSocket != null) { findSocket.close(); findSocket = null; }
+        if (multicastLock != null && multicastLock.isHeld()) multicastLock.release();
     }
 
     // ------------------------------------------------------------------
     //  servers
     // ------------------------------------------------------------------
     private void stopServers() {
+        beaconInfo = null;
         try { if (tcpServer != null) tcpServer.close(); } catch (IOException ignored) { }
         try { if (wsServer != null) wsServer.close(); } catch (IOException ignored) { }
         tcpServer = null;
